@@ -1,0 +1,19 @@
+{
+  "name": "capstone-grid",
+  "version": "0.1.0",
+  "description": "Capstone Grid - centralized platform for university capstone projects",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node --watch backend/server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.7",
+    "express": "^5.3.0",
+    "jsonwebtoken": "^9.0.3"
+  }
+}
