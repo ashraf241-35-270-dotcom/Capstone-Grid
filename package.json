@@ -1,0 +1,21 @@
+{
+  "name": "capstone-grid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capstone Grid - a centralized platform for submitting, reviewing, managing and showcasing university capstone projects.",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n API,WEB -c cyan,magenta \"npm run dev -w capstone-grid-api\" \"npm run dev -w capstone-grid-web\"",
+    "start": "npm run dev",
+    "build": "npm run build -w capstone-grid-web",
+    "preview": "npm run preview -w capstone-grid-web",
+    "db:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-db.ps1",
+    "db:verify": "npm run db:verify -w capstone-grid-api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
