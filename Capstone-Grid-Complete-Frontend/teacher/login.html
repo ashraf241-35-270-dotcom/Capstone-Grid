@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Login | Capstone Grid</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+
+<body class="auth-body">
+    <section class="auth-aside teacher"><a class="brand" href="../index.html" style="color:white"><span
+                class="brand-mark">CG</span>Capstone<span style="font-weight:500;color:#d7d4eb">Grid</span></a>
+        <div><span class="eyebrow" style="color:#d3ceff">Teacher WORKSPACE</span>
+            <h1>Guide ideas. Shape what’s next.</h1>
+            <p>Review submissions, support students and monitor capstone progress from one place.</p>
+        </div><small style="letter-spacing:2px;color:#d0cbea">CAPSTONE · COLLABORATE · COMPLETE</small>
+    </section>
+    <section class="auth-main">
+        <form class="auth-form" data-auth-form data-role="teacher" data-action="login"><span class="eyebrow">Teacher
+                ACCOUNT</span>
+            <h2>Welcome back</h2>
+            <p>Sign in to your teacher workspace.</p>
+            <div class="field"><label>University email</label><input name="email" type="email"
+                    placeholder="teacher@university.edu" required></div>
+            <div class="field"><label>Password</label><input name="password" type="password"
+                    placeholder="Enter your password" required minlength="8"></div><button class="btn btn-primary"
+                type="submit" style="width:100%;margin-top:12px">Sign In →</button>
+            <div class="message" aria-live="polite"></div>
+            <div class="auth-foot">Don't have an account? <a href='teacher-register.html'>Create teacher account</a>
+            </div>
+            <div class="auth-foot"><a href="../index.html">← Back to home</a></div>
+        </form>
+    </section>
+</body>
+<script src="../js/auth.js"></script>
+
+</html>

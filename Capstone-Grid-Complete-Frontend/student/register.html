@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Registration | Capstone Grid</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+
+<body class="auth-body">
+    <section class="auth-aside "><a class="brand" href="../index.html" style="color:white"><span
+                class="brand-mark">CG</span>Capstone<span style="font-weight:500;color:#d7d4eb">Grid</span></a>
+        <div><span class="eyebrow" style="color:#d3ceff">Student WORKSPACE</span>
+            <h1>Your capstone journey starts here.</h1>
+            <p>Bring your ideas, files, milestones and project updates together in one organized space.</p>
+        </div><small style="letter-spacing:2px;color:#d0cbea">CAPSTONE · COLLABORATE · COMPLETE</small>
+    </section>
+    <section class="auth-main">
+        <form class="auth-form" data-auth-form data-role="student" data-action="register"><span class="eyebrow">Student
+                ACCOUNT</span>
+            <h2>Create account</h2>
+            <p>Register for your student workspace.</p>
+            <div class="field"><label>Full name</label><input name="name" type="text" placeholder="Enter full name"
+                    required></div>
+            <div class="field"><label>Student ID</label><input name="studentId" type="text"
+                    placeholder="Enter student id" required></div>
+            <div class="field"><label>University email</label><input name="email" type="email"
+                    placeholder="Enter university email" required></div>
+            <div class="field"><label>Department</label><select name="department" required>
+                    <option value="">Select department</option>
+                    <option>Computer Science & Engineering</option>
+                    <option>Software Engineering</option>
+                    <option>Electrical & Electronic Engineering</option>
+                    <option>Business Administration</option>
+                    <option>Other</option>
+                </select></div>
+            <div class="field"><label>Password</label><input name="password" type="password"
+                    placeholder="At least 8 characters" required minlength="8"></div>
+            <div class="field"><label>Confirm password</label><input name="confirmPassword" type="password"
+                    placeholder="Re-enter password" required minlength="8"></div>
+            <div class="field"><label><input type="checkbox" name="terms" required> I agree to the platform terms and
+                    privacy policy.</label></div><button class="btn btn-primary" type="submit"
+                style="width:100%;margin-top:12px">Create Student Account →</button>
+            <div class="message" aria-live="polite"></div>
+            <div class="auth-foot">Already registered? <a href='student-login.html'>Student login</a></div>
+            <div class="auth-foot"><a href="../index.html">← Back to home</a></div>
+        </form>
+    </section>
+</body>
+<script src="../js/auth.js"></script>
+
+</html>
