@@ -1,6 +1,7 @@
 const express = require('express');
-const { query } = require('../db');
+const { query, transaction } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { createNotification } = require('../notifications');
 
 const router = express.Router();
 
@@ -203,10 +204,19 @@ router.post('/:id/enrollments', requireAuth, requireRole('Teacher'), async (req,
     return res.status(409).json({ error: 'That student is already enrolled in this section.' });
   }
 
-  const result = await query(
-    'INSERT INTO enrollments (section_id, student_id) VALUES (?, ?)',
-    [sectionId, student.user_id]
-  );
+  const result = await transaction(async (execute) => {
+    const enrollment = await execute(
+      'INSERT INTO enrollments (section_id, student_id) VALUES (?, ?)',
+      [sectionId, student.user_id]
+    );
+    await createNotification(execute, {
+      userId: student.user_id,
+      type: 'assignment',
+      message: `You were enrolled in ${section.course_code} ${section.section_name} (${section.semester}).`,
+      sectionId
+    });
+    return enrollment;
+  });
 
   const rows = await query(
     `SELECT e.enrollment_id, e.enrolled_at,

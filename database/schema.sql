@@ -176,6 +176,44 @@ CREATE TABLE IF NOT EXISTS reviews (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS project_comments (
+  comment_id  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id  INT UNSIGNED NOT NULL,
+  user_id     INT UNSIGNED NOT NULL,
+  message     TEXT NOT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (comment_id),
+  KEY idx_project_comments_project_created (project_id, created_at),
+  CONSTRAINT fk_project_comments_project
+    FOREIGN KEY (project_id) REFERENCES projects (project_id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_project_comments_user
+    FOREIGN KEY (user_id) REFERENCES users (user_id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS notifications (
+  notification_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id         INT UNSIGNED NOT NULL,
+  type            ENUM('assignment', 'submission', 'feedback', 'comment', 'deadline') NOT NULL,
+  message         VARCHAR(500) NOT NULL,
+  project_id      INT UNSIGNED NULL,
+  section_id      INT UNSIGNED NULL,
+  is_read         TINYINT(1) NOT NULL DEFAULT 0,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (notification_id),
+  KEY idx_notifications_user_read_created (user_id, is_read, created_at),
+  CONSTRAINT fk_notifications_user
+    FOREIGN KEY (user_id) REFERENCES users (user_id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_notifications_project
+    FOREIGN KEY (project_id) REFERENCES projects (project_id)
+    ON DELETE SET NULL,
+  CONSTRAINT fk_notifications_section
+    FOREIGN KEY (section_id) REFERENCES sections (section_id)
+    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS project_files (
   file_id        INT UNSIGNED NOT NULL AUTO_INCREMENT,
   project_id     INT UNSIGNED NOT NULL,

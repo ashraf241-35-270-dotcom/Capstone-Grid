@@ -7,6 +7,8 @@ async function main() {
     const [departments] = await query('SELECT COUNT(*) AS total FROM departments');
     const [users] = await query('SELECT COUNT(*) AS total FROM users');
     const [reviews] = await query('SELECT COUNT(*) AS total FROM reviews');
+    const [comments] = await query('SELECT COUNT(*) AS total FROM project_comments');
+    const [notifications] = await query('SELECT COUNT(*) AS total FROM notifications');
     const tables = config.dbClient === 'sqlite'
       ? await query("SELECT COUNT(*) AS total FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
       : await query(
@@ -17,7 +19,10 @@ async function main() {
     const databaseName = config.dbClient === 'sqlite' ? config.sqlitePath : config.db.database;
 
     console.log(`Connected to ${config.dbClient} database "${databaseName}".`);
-    console.log(`Tables: ${tables[0].total} | Departments: ${departments.total} | Users: ${users.total} | Reviews: ${reviews.total}`);
+    console.log(
+      `Tables: ${tables[0].total} | Departments: ${departments.total} | Users: ${users.total}` +
+      ` | Reviews: ${reviews.total} | Comments: ${comments.total} | Notifications: ${notifications.total}`
+    );
   } finally {
     await closePool();
   }

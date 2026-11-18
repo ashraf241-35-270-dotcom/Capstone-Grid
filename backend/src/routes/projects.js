@@ -4,6 +4,7 @@ const path = require('path');
 const multer = require('multer');
 const { query, transaction } = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { createNotification, notifyProjectParticipants } = require('../notifications');
 
 const router = express.Router();
 const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
@@ -341,10 +342,20 @@ router.post('/:id/milestones', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Please provide a valid milestone deadline.' });
   }
 
-  const result = await query(
-    'INSERT INTO milestones (project_id, title, description, deadline) VALUES (?, ?, ?, ?)',
-    [projectId, cleanTitle, cleanDescription || null, cleanDeadline.value]
-  );
+  const result = await transaction(async (execute) => {
+    const milestone = await execute(
+      'INSERT INTO milestones (project_id, title, description, deadline) VALUES (?, ?, ?, ?)',
+      [projectId, cleanTitle, cleanDescription || null, cleanDeadline.value]
+    );
+    if (cleanDeadline.value) {
+      await notifyProjectParticipants(
+        execute,
+        projectId,
+        `Deadline set for milestone "${cleanTitle}" on ${cleanDeadline.value}.`
+      );
+    }
+    return milestone;
+  });
   const rows = await query('SELECT * FROM milestones WHERE milestone_id = ? LIMIT 1', [result.insertId]);
   return res.status(201).json({ milestone: rows[0] });
 });
@@ -360,7 +371,7 @@ router.put('/:id/milestones/:milestoneId', requireAuth, async (req, res) => {
   if (!project) return;
 
   const milestoneRows = await query(
-    'SELECT milestone_id FROM milestones WHERE milestone_id = ? AND project_id = ? LIMIT 1',
+    'SELECT milestone_id, title, deadline FROM milestones WHERE milestone_id = ? AND project_id = ? LIMIT 1',
     [milestoneId, projectId]
   );
   if (milestoneRows.length === 0) {
@@ -370,6 +381,7 @@ router.put('/:id/milestones/:milestoneId', requireAuth, async (req, res) => {
   const { title, description, deadline, status } = req.body || {};
   const updates = [];
   const params = [];
+  let deadlineNotification = null;
   if (title !== undefined) {
     const cleanTitle = typeof title === 'string' ? title.trim() : '';
     if (cleanTitle.length < 3 || cleanTitle.length > 160) {
@@ -393,6 +405,11 @@ router.put('/:id/milestones/:milestoneId', requireAuth, async (req, res) => {
     }
     updates.push('deadline = ?');
     params.push(cleanDeadline.value);
+    if (cleanDeadline.value !== milestoneRows[0].deadline) {
+      deadlineNotification = cleanDeadline.value
+        ? `Deadline set for milestone "${title || milestoneRows[0].title}" on ${cleanDeadline.value}.`
+        : `Deadline removed from milestone "${title || milestoneRows[0].title}".`;
+    }
   }
   if (status !== undefined) {
     if (!['Not Started', 'In Progress', 'Completed'].includes(status)) {
@@ -406,10 +423,15 @@ router.put('/:id/milestones/:milestoneId', requireAuth, async (req, res) => {
   }
 
   params.push(milestoneId, projectId);
-  await query(
-    `UPDATE milestones SET ${updates.join(', ')} WHERE milestone_id = ? AND project_id = ?`,
-    params
-  );
+  await transaction(async (execute) => {
+    await execute(
+      `UPDATE milestones SET ${updates.join(', ')} WHERE milestone_id = ? AND project_id = ?`,
+      params
+    );
+    if (deadlineNotification) {
+      await notifyProjectParticipants(execute, projectId, deadlineNotification);
+    }
+  });
   const rows = await query('SELECT * FROM milestones WHERE milestone_id = ? LIMIT 1', [milestoneId]);
   return res.json({ milestone: rows[0] });
 });
@@ -463,10 +485,20 @@ router.post('/:id/milestones/:milestoneId/tasks', requireAuth, async (req, res) 
     return res.status(400).json({ error: 'Please provide a valid task due date.' });
   }
 
-  const result = await query(
-    'INSERT INTO milestone_tasks (milestone_id, title, due_date) VALUES (?, ?, ?)',
-    [milestoneId, cleanTitle, cleanDueDate.value]
-  );
+  const result = await transaction(async (execute) => {
+    const task = await execute(
+      'INSERT INTO milestone_tasks (milestone_id, title, due_date) VALUES (?, ?, ?)',
+      [milestoneId, cleanTitle, cleanDueDate.value]
+    );
+    if (cleanDueDate.value) {
+      await notifyProjectParticipants(
+        execute,
+        projectId,
+        `Deadline set for task "${cleanTitle}" on ${cleanDueDate.value}.`
+      );
+    }
+    return task;
+  });
   const rows = await query('SELECT * FROM milestone_tasks WHERE task_id = ? LIMIT 1', [result.insertId]);
   return res.status(201).json({ task: rows[0] });
 });
@@ -483,7 +515,7 @@ router.put('/:id/milestones/:milestoneId/tasks/:taskId', requireAuth, async (req
   if (!project) return;
 
   const taskRows = await query(
-    `SELECT mt.task_id FROM milestone_tasks mt
+    `SELECT mt.task_id, mt.title, mt.due_date FROM milestone_tasks mt
        JOIN milestones m ON m.milestone_id = mt.milestone_id
       WHERE mt.task_id = ? AND mt.milestone_id = ? AND m.project_id = ?
       LIMIT 1`,
@@ -496,6 +528,7 @@ router.put('/:id/milestones/:milestoneId/tasks/:taskId', requireAuth, async (req
   const { title, dueDate, status } = req.body || {};
   const updates = [];
   const params = [];
+  let deadlineNotification = null;
   if (title !== undefined) {
     const cleanTitle = typeof title === 'string' ? title.trim() : '';
     if (cleanTitle.length < 3 || cleanTitle.length > 160) {
@@ -511,6 +544,11 @@ router.put('/:id/milestones/:milestoneId/tasks/:taskId', requireAuth, async (req
     }
     updates.push('due_date = ?');
     params.push(cleanDueDate.value);
+    if (cleanDueDate.value !== taskRows[0].due_date) {
+      deadlineNotification = cleanDueDate.value
+        ? `Deadline set for task "${title || taskRows[0].title}" on ${cleanDueDate.value}.`
+        : `Deadline removed from task "${title || taskRows[0].title}".`;
+    }
   }
   if (status !== undefined) {
     if (!['Not Started', 'In Progress', 'Completed'].includes(status)) {
@@ -524,7 +562,12 @@ router.put('/:id/milestones/:milestoneId/tasks/:taskId', requireAuth, async (req
   }
 
   params.push(taskId);
-  await query(`UPDATE milestone_tasks SET ${updates.join(', ')} WHERE task_id = ?`, params);
+  await transaction(async (execute) => {
+    await execute(`UPDATE milestone_tasks SET ${updates.join(', ')} WHERE task_id = ?`, params);
+    if (deadlineNotification) {
+      await notifyProjectParticipants(execute, projectId, deadlineNotification);
+    }
+  });
   const rows = await query('SELECT * FROM milestone_tasks WHERE task_id = ? LIMIT 1', [taskId]);
   return res.json({ task: rows[0] });
 });
@@ -551,6 +594,106 @@ router.delete('/:id/milestones/:milestoneId/tasks/:taskId', requireAuth, async (
   }
 
   return res.json({ deleted: true });
+});
+
+router.get('/:id/comments', requireAuth, async (req, res) => {
+  const projectId = parseId(req.params.id);
+  if (!projectId) {
+    return res.status(400).json({ error: 'Invalid project id.' });
+  }
+
+  const { project, allowed } = await userCanAccessProject(req.user, projectId);
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found.' });
+  }
+  if (!allowed) {
+    return res.status(403).json({ error: 'You do not have access to this project.' });
+  }
+
+  const comments = await query(
+    `SELECT c.comment_id, c.project_id, c.user_id, c.message, c.created_at,
+            u.name AS author_name, u.role AS author_role
+       FROM project_comments c
+       JOIN users u ON u.user_id = c.user_id
+      WHERE c.project_id = ?
+      ORDER BY c.created_at DESC, c.comment_id DESC`,
+    [projectId]
+  );
+  return res.json({
+    comments: comments.map((comment) => ({
+      commentId: comment.comment_id,
+      projectId: comment.project_id,
+      userId: comment.user_id,
+      authorName: comment.author_name,
+      authorRole: comment.author_role,
+      message: comment.message,
+      createdAt: comment.created_at
+    }))
+  });
+});
+
+router.post('/:id/comments', requireAuth, async (req, res) => {
+  const projectId = parseId(req.params.id);
+  if (!projectId) {
+    return res.status(400).json({ error: 'Invalid project id.' });
+  }
+
+  const { project, allowed } = await userCanAccessProject(req.user, projectId);
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found.' });
+  }
+  if (!allowed) {
+    return res.status(403).json({ error: 'You do not have access to this project.' });
+  }
+
+  const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+  if (message.length < 1 || message.length > 2000) {
+    return res.status(400).json({ error: 'Comment must be between 1 and 2000 characters.' });
+  }
+
+  let recipientId = req.user.role === 'Teacher' ? project.student_id : null;
+  if (req.user.role === 'Student' && project.section_id) {
+    const teachers = await query(
+      'SELECT teacher_id FROM sections WHERE section_id = ? LIMIT 1',
+      [project.section_id]
+    );
+    recipientId = teachers[0]?.teacher_id || null;
+  }
+
+  const commentId = await transaction(async (execute) => {
+    const result = await execute(
+      'INSERT INTO project_comments (project_id, user_id, message) VALUES (?, ?, ?)',
+      [projectId, req.user.id, message]
+    );
+    await createNotification(execute, {
+      userId: recipientId,
+      type: 'comment',
+      message: `${req.user.name} commented on "${project.title}".`,
+      projectId
+    });
+    return result.insertId;
+  });
+  const comments = await query(
+    `SELECT c.comment_id, c.project_id, c.user_id, c.message, c.created_at,
+            u.name AS author_name, u.role AS author_role
+       FROM project_comments c
+       JOIN users u ON u.user_id = c.user_id
+      WHERE c.comment_id = ?
+      LIMIT 1`,
+    [commentId]
+  );
+  const comment = comments[0];
+  return res.status(201).json({
+    comment: {
+      commentId: comment.comment_id,
+      projectId: comment.project_id,
+      userId: comment.user_id,
+      authorName: comment.author_name,
+      authorRole: comment.author_role,
+      message: comment.message,
+      createdAt: comment.created_at
+    }
+  });
 });
 
 router.get('/:id/reviews', requireAuth, async (req, res) => {
@@ -625,6 +768,12 @@ router.post('/:id/reviews', requireAuth, async (req, res) => {
       'INSERT INTO reviews (project_id, teacher_id, decision, feedback, marks, rating) VALUES (?, ?, ?, ?, ?, ?)',
       [projectId, req.user.id, decision, cleanFeedback, marks, rating]
     );
+    await createNotification(execute, {
+      userId: project.student_id,
+      type: 'feedback',
+      message: `New review feedback is available for "${project.title}".`,
+      projectId
+    });
     return result.insertId;
   });
 
@@ -752,7 +901,23 @@ router.put('/:id', requireAuth, async (req, res) => {
   }
 
   params.push(projectId);
-  await query(`UPDATE projects SET ${updates.join(', ')} WHERE project_id = ?`, params);
+  await transaction(async (execute) => {
+    await execute(`UPDATE projects SET ${updates.join(', ')} WHERE project_id = ?`, params);
+    if (status === 'Submitted' && project.section_id) {
+      const sections = await execute(
+        'SELECT teacher_id FROM sections WHERE section_id = ? LIMIT 1',
+        [project.section_id]
+      );
+      if (sections.length > 0) {
+        await createNotification(execute, {
+          userId: sections[0].teacher_id,
+          type: 'submission',
+          message: `${project.studentName} submitted "${project.title}" for review.`,
+          projectId
+        });
+      }
+    }
+  });
 
   const refreshed = await findProject(projectId);
   return res.json({ project: normalizeProject(refreshed) });

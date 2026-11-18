@@ -3,6 +3,7 @@ import api, { getErrorMessage } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import ProjectTrackingPanel from '../components/ProjectTrackingPanel.jsx';
 import ReviewPanel from '../components/ReviewPanel.jsx';
+import ProjectCommentsPanel from '../components/ProjectCommentsPanel.jsx';
 
 export default function ProjectsPage() {
   const { user } = useAuth();
@@ -298,6 +299,7 @@ export default function ProjectsPage() {
                           isTeacher={!isStudent}
                           onProjectChanged={loadProjects}
                         />
+                        <ProjectCommentsPanel project={project} />
 
                         {isStudent && ['Draft', 'In Progress', 'Changes Requested'].includes(project.status) && <div className="upload-box">
                           <label className="btn btn-ghost btn-sm upload-button">

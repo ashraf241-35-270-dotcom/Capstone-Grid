@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import NotificationCenter from './NotificationCenter.jsx';
 
 export function initialsOf(name = '') {
   return (
@@ -41,6 +42,7 @@ export default function Navbar() {
         <div className="nav-actions">
           {user ? (
             <>
+              <NotificationCenter />
               <div className="user-chip">
                 <span className="avatar" aria-hidden="true">{initialsOf(user.name)}</span>
                 <span className="user-meta">

@@ -104,6 +104,32 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 CREATE INDEX IF NOT EXISTS idx_reviews_project_reviewed ON reviews (project_id, reviewed_at);
 
+CREATE TABLE IF NOT EXISTS project_comments (
+  comment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  message TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects (project_id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_project_comments_project_created ON project_comments (project_id, created_at);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  notification_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('assignment', 'submission', 'feedback', 'comment', 'deadline')),
+  message TEXT NOT NULL,
+  project_id INTEGER,
+  section_id INTEGER,
+  is_read INTEGER NOT NULL DEFAULT 0 CHECK (is_read IN (0, 1)),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
+  FOREIGN KEY (project_id) REFERENCES projects (project_id) ON DELETE SET NULL,
+  FOREIGN KEY (section_id) REFERENCES sections (section_id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read_created ON notifications (user_id, is_read, created_at);
+
 CREATE TABLE IF NOT EXISTS project_files (
   file_id INTEGER PRIMARY KEY AUTOINCREMENT,
   project_id INTEGER NOT NULL,

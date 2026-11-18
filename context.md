@@ -169,7 +169,7 @@ UX notes:
 | 3 | Project repositories + file uploads | FR-02, FR-03 | **Built — awaiting owner review** |
 | 4 | Status workflow, milestones, tasks, deadlines, progress | FR-06, FR-09 | Implemented — MySQL check pending |
 | 5 | Review workflow: accept/request changes, feedback, marks, ratings | FR-08 | **Built — awaiting owner review** |
-| 6 | Project comments + notifications | FR-07, FR-11 | Not started |
+| 6 | Project comments + notifications | FR-07, FR-11 | **Built — awaiting owner review** |
 | 7 | Public text/photo posts + opinions | FR-13, FR-14 | Not started |
 | 8 | Public dashboard data, search/filter, archive | FR-05, FR-10, FR-12 | Not started |
 | 9 | Password recovery, testing, hardening, docs polish | FR-01 (recovery), NFRs | Not started |
@@ -510,6 +510,31 @@ Step 5 is built and awaits owner review. Continue with Step 6 only after explici
 - Known issues/follow-ups: MySQL and the manual browser checklist were not exercised in this
   environment; owner should complete the Step 5 checklist below before approving Step 6.
 - Next step proposal: Step 6 — project comments and notifications, only after explicit owner approval.
+
+### 2026-11-19 — Step 6 communication work log (assistant)
+
+- Owner prompt (verbatim): "okay everything fine , go for next step development"
+- Files added/changed: `database/schema.sql`, `database/schema.sqlite.sql`,
+  `backend/src/notifications.js`, `backend/src/routes/notifications.js`,
+  `backend/src/routes/projects.js`, `backend/src/routes/sections.js`, `backend/server.js`,
+  `backend/scripts/verify-db.js`, `frontend/src/components/NotificationCenter.jsx`,
+  `frontend/src/components/ProjectCommentsPanel.jsx`, `frontend/src/components/Navbar.jsx`,
+  `frontend/src/pages/ProjectsPage.jsx`, `frontend/src/styles.css`, `README.md`, `context.md`.
+- Schema/API changes: added private project comments and per-user notifications; assignment,
+  submission, feedback, comment, and deadline events create in-app notices; users can list and mark
+  their own notices read.
+- Decisions: deadline notices are emitted when a milestone/task deadline is created or changed; no
+  scheduled advance reminder window was added. Comments are limited to project owners and assigned
+  teachers. Notifications are in-app and scoped to their recipient.
+- Verification performed: `npm run db:verify` passed (SQLite; 14 tables, 13 departments, 6 users,
+  no residual test comments/notifications); `npm run build`, backend `node --check`, and
+  `git diff --check` passed. Live API integration passed assignment, comment access, deadline,
+  submission, feedback, and per-user read-state checks.
+- Known issues/follow-ups: the Step 6 browser checklist remains for owner review; MySQL schema was
+  not exercised against a live MySQL server. Deadline notices are event-based, not scheduled advance
+  reminders, and notifications are in-app only.
+- Next step proposal: Step 7 — public text/photo posts and post opinions, only after explicit owner
+  approval.
 
 ---
 

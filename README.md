@@ -178,12 +178,17 @@ All responses are JSON. Errors use `{ "error": "message" }`.
 | POST   | `/api/projects/:id/files` | Student | Upload files to an editable project repository |
 | GET    | `/api/projects/:id/files/:fileId` | Token | Download a project file privately |
 | GET   | `/api/projects/:id/tracking` | Token | View milestones, tasks, and project progress |
+| GET    | `/api/projects/:id/comments` | Owner/assigned teacher | View project conversation |
+| POST   | `/api/projects/:id/comments` | Owner/assigned teacher | Add a project message |
 | GET    | `/api/projects/:id/reviews` | Owner/assigned teacher | View private review history |
 | POST   | `/api/projects/:id/reviews` | Assigned teacher | Decide Accepted/Changes Requested; include feedback, marks (0–100), rating (1–5) |
 | POST  | `/api/projects/:id/milestones` | Student | Add a project milestone and deadline |
 | PUT/DELETE | `/api/projects/:id/milestones/:milestoneId` | Student | Update or delete a milestone and its tasks |
 | POST  | `/api/projects/:id/milestones/:milestoneId/tasks` | Student | Add a task and due date |
 | PUT/DELETE | `/api/projects/:id/milestones/:milestoneId/tasks/:taskId` | Student | Update or delete a task |
+| GET    | `/api/notifications`   | Token   | List the signed-in user's 50 latest notifications and unread count |
+| PUT    | `/api/notifications/:id/read` | Token | Mark one owned notification as read |
+| PUT    | `/api/notifications/read-all` | Token | Mark all owned notifications as read |
 | POST   | `/api/auth/register`   | Public  | Create Student/Teacher account                   |
 | POST   | `/api/auth/login`      | Public  | Log in with email + password + role              |
 | GET    | `/api/auth/me`         | Token   | Current user profile                             |
@@ -226,14 +231,17 @@ Implemented tables (see `database/schema.sql` for MySQL and `database/schema.sql
   `title`, `description`, `status`, `visibility`, `created_at`, `submitted_at`, `archived_at`.
 - **`reviews`** — `review_id` PK, `project_id` FK, `teacher_id` FK, decision, feedback, marks
   (0–100), rating (1–5), `reviewed_at`; every review is retained as history.
+- **`project_comments`** — `comment_id` PK, `project_id` FK, `user_id` FK, message, `created_at`;
+  visible only to the project owner and assigned teacher.
+- **`notifications`** — `notification_id` PK, `user_id` FK, type, message, optional project/section
+  links, read state, `created_at`; each user can access only their own notifications.
 - **`project_files`** — `file_id` PK, `project_id` FK, `file_name`, `original_name`, `mime_type`,
   `file_size`, `file_path`, `uploaded_at`.
 - **`milestones`** — `milestone_id` PK, `project_id` FK, `title`, `description`, `deadline`,
   `status`, timestamps.
 - **`milestone_tasks`** — `task_id` PK, `milestone_id` FK, `title`, `due_date`, `status`, timestamps.
 
-Planned tables from the proposal’s ER model, added in later steps: `project_comments`, `posts`,
-`post_comments`, `notifications`.
+Planned tables from the proposal’s ER model, added in later steps: `posts`, `post_comments`.
 
 Project progress is calculated from completed tasks when a project has tasks; otherwise it is
 calculated from completed milestones. Projects with no milestones start at 0%.
@@ -261,7 +269,7 @@ Each step is built and reviewed with the project owner before the next begins.
   Project status workflow, milestones, tasks, deadlines, progress percentage.
 - [x] **Step 5 — Review workflow (FR-08; built, awaiting owner review)**
   Submissions, accept/request changes, feedback, marks, ratings, review history.
-- [ ] **Step 6 — Communication (FR-07, FR-11)**
+- [x] **Step 6 — Communication (FR-07, FR-11; built, awaiting owner review)**
   Project comments and notifications (assignments, submissions, feedback, deadlines).
 - [ ] **Step 7 — Community dashboard (FR-13, FR-14)**
   Public text/photo posts, image upload, opinions on posts.
@@ -326,6 +334,21 @@ Each step is built and reviewed with the project owner before the next begins.
 7. Confirm a submitted or accepted project cannot be edited or receive uploads until changes are
    requested.
 8. Restart the API and confirm review history persists.
+
+## Step 6 verification checklist
+
+1. Run `npm run db:verify` and confirm `project_comments` and `notifications` tables exist.
+2. Enroll a student in a teacher's section and confirm that student receives an assignment notice.
+3. Submit a project and confirm its assigned teacher receives a submission notice. Review it and
+   confirm the student receives a feedback notice.
+4. Add a message as the student and as the assigned teacher; confirm both sides see the conversation
+   and the other participant receives a comment notice.
+5. Add or change a milestone/task deadline and confirm project participants receive a deadline
+   notice. These are event-based notices, not scheduled advance reminders.
+6. Confirm the notification badge/list updates, one notification can be marked read, and Mark all
+   read clears the unread count.
+7. Confirm unrelated users cannot read another user's notifications or another project's comments.
+8. Restart the API and confirm comments and notification read states persist.
 
 ---
 
