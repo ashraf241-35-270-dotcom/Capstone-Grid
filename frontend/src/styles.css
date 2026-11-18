@@ -624,6 +624,43 @@ button {
   margin-top: 14px;
 }
 
+.review-panel {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.review-panel-head,
+.review-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.review-panel-head h4 {
+  margin: 0;
+}
+
+.review-form,
+.review-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.review-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.review-card p {
+  margin: 10px 0;
+  white-space: pre-wrap;
+}
+
 .roster {
   margin-top: 20px;
   padding-top: 18px;

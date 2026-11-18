@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import api, { getErrorMessage } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import ProjectTrackingPanel from '../components/ProjectTrackingPanel.jsx';
+import ReviewPanel from '../components/ReviewPanel.jsx';
 
 export default function ProjectsPage() {
   const { user } = useAuth();
@@ -107,7 +108,9 @@ export default function ProjectsPage() {
   }
 
   async function changeProjectStatus(project) {
-    const nextStatus = project.status === 'Draft' ? 'In Progress' : 'Submitted';
+    const nextStatus = project.status === 'Draft' || project.status === 'Changes Requested'
+      ? 'In Progress'
+      : 'Submitted';
     if (nextStatus === 'Submitted' && !window.confirm('Submit this project for review?')) return;
 
     setError('');
@@ -254,7 +257,7 @@ export default function ProjectsPage() {
                         <div className="section-actions">
                           <span className="pill pill-soon">{project.status}</span>
                           <span className="pill pill-progress">{project.visibility}</span>
-                          {isStudent && project.status !== 'Submitted' && (
+                          {isStudent && ['Draft', 'In Progress', 'Changes Requested'].includes(project.status) && (
                             <button
                               type="button"
                               className="btn btn-primary btn-sm"
@@ -263,7 +266,9 @@ export default function ProjectsPage() {
                             >
                               {statusActionId === project.projectId
                                 ? 'Updating...'
-                                : (project.status === 'Draft' ? 'Start project' : 'Submit project')}
+                                : (project.status === 'Draft'
+                                  ? 'Start project'
+                                  : (project.status === 'Changes Requested' ? 'Start revisions' : 'Submit project'))}
                             </button>
                           )}
                         </div>
@@ -288,7 +293,13 @@ export default function ProjectsPage() {
                           onProjectChanged={loadProjects}
                         />
 
-                        {isStudent && <div className="upload-box">
+                        <ReviewPanel
+                          project={project}
+                          isTeacher={!isStudent}
+                          onProjectChanged={loadProjects}
+                        />
+
+                        {isStudent && ['Draft', 'In Progress', 'Changes Requested'].includes(project.status) && <div className="upload-box">
                           <label className="btn btn-ghost btn-sm upload-button">
                             <input type="file" multiple onChange={(event) => handleUpload(project.projectId, event)} />
                             {uploadingId === project.projectId ? 'Uploading...' : 'Upload files'}

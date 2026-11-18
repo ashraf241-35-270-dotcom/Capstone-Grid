@@ -6,6 +6,7 @@ async function main() {
     await initSchema();
     const [departments] = await query('SELECT COUNT(*) AS total FROM departments');
     const [users] = await query('SELECT COUNT(*) AS total FROM users');
+    const [reviews] = await query('SELECT COUNT(*) AS total FROM reviews');
     const tables = config.dbClient === 'sqlite'
       ? await query("SELECT COUNT(*) AS total FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
       : await query(
@@ -16,7 +17,7 @@ async function main() {
     const databaseName = config.dbClient === 'sqlite' ? config.sqlitePath : config.db.database;
 
     console.log(`Connected to ${config.dbClient} database "${databaseName}".`);
-    console.log(`Tables: ${tables[0].total} | Departments: ${departments.total} | Users: ${users.total}`);
+    console.log(`Tables: ${tables[0].total} | Departments: ${departments.total} | Users: ${users.total} | Reviews: ${reviews.total}`);
   } finally {
     await closePool();
   }

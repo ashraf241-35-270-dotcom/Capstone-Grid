@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
-const { query } = require('../db');
+const { query, transaction } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -119,6 +119,20 @@ async function userCanAccessProject(user, projectId) {
   }
 
   return { project, allowed: Number(project.student_id) === Number(user.id) };
+}
+
+function normalizeReview(row) {
+  return {
+    reviewId: row.review_id,
+    projectId: row.project_id,
+    teacherId: row.teacher_id,
+    teacherName: row.teacher_name,
+    decision: row.decision,
+    feedback: row.feedback,
+    marks: Number(row.marks),
+    rating: Number(row.rating),
+    reviewedAt: row.reviewed_at
+  };
 }
 
 router.get('/', requireAuth, async (req, res) => {
@@ -539,6 +553,97 @@ router.delete('/:id/milestones/:milestoneId/tasks/:taskId', requireAuth, async (
   return res.json({ deleted: true });
 });
 
+router.get('/:id/reviews', requireAuth, async (req, res) => {
+  const projectId = parseId(req.params.id);
+  if (!projectId) {
+    return res.status(400).json({ error: 'Invalid project id.' });
+  }
+
+  const { project, allowed } = await userCanAccessProject(req.user, projectId);
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found.' });
+  }
+  if (!allowed) {
+    return res.status(403).json({ error: 'You do not have access to this project.' });
+  }
+
+  const reviews = await query(
+    `SELECT r.review_id, r.project_id, r.teacher_id, r.decision, r.feedback, r.marks,
+            r.rating, r.reviewed_at, u.name AS teacher_name
+       FROM reviews r
+       JOIN users u ON u.user_id = r.teacher_id
+      WHERE r.project_id = ?
+      ORDER BY r.reviewed_at DESC, r.review_id DESC`,
+    [projectId]
+  );
+  return res.json({ reviews: reviews.map(normalizeReview) });
+});
+
+router.post('/:id/reviews', requireAuth, async (req, res) => {
+  const projectId = parseId(req.params.id);
+  if (!projectId) {
+    return res.status(400).json({ error: 'Invalid project id.' });
+  }
+
+  const { project, allowed } = await userCanAccessProject(req.user, projectId);
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found.' });
+  }
+  if (!allowed) {
+    return res.status(403).json({ error: 'You do not have access to this project.' });
+  }
+  if (req.user.role !== 'Teacher') {
+    return res.status(403).json({ error: 'Only the assigned teacher can review this project.' });
+  }
+  if (project.status !== 'Submitted') {
+    return res.status(409).json({ error: 'Only submitted projects can be reviewed.' });
+  }
+
+  const { decision, feedback, marks, rating } = req.body || {};
+  const cleanFeedback = typeof feedback === 'string' ? feedback.trim() : '';
+  if (!['Accepted', 'Changes Requested'].includes(decision)) {
+    return res.status(400).json({ error: 'Decision must be Accepted or Changes Requested.' });
+  }
+  if (cleanFeedback.length < 1 || cleanFeedback.length > 5000) {
+    return res.status(400).json({ error: 'Feedback must be between 1 and 5000 characters.' });
+  }
+  if (typeof marks !== 'number' || !Number.isFinite(marks) || marks < 0 || marks > 100 || Math.round(marks * 100) !== marks * 100) {
+    return res.status(400).json({ error: 'Marks must be a number from 0 to 100 with at most two decimal places.' });
+  }
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ error: 'Rating must be a whole number from 1 to 5.' });
+  }
+
+  const reviewId = await transaction(async (execute) => {
+    const updated = await execute(
+      'UPDATE projects SET status = ? WHERE project_id = ? AND status = ?',
+      [decision, projectId, 'Submitted']
+    );
+    if (updated.affectedRows === 0) return null;
+
+    const result = await execute(
+      'INSERT INTO reviews (project_id, teacher_id, decision, feedback, marks, rating) VALUES (?, ?, ?, ?, ?, ?)',
+      [projectId, req.user.id, decision, cleanFeedback, marks, rating]
+    );
+    return result.insertId;
+  });
+
+  if (reviewId === null) {
+    return res.status(409).json({ error: 'This project has already been reviewed.' });
+  }
+
+  const rows = await query(
+    `SELECT r.review_id, r.project_id, r.teacher_id, r.decision, r.feedback, r.marks,
+            r.rating, r.reviewed_at, u.name AS teacher_name
+       FROM reviews r
+       JOIN users u ON u.user_id = r.teacher_id
+      WHERE r.review_id = ?
+      LIMIT 1`,
+    [reviewId]
+  );
+  return res.status(201).json({ review: normalizeReview(rows[0]) });
+});
+
 router.get('/:id', requireAuth, async (req, res) => {
   const projectId = parseId(req.params.id);
   if (!projectId) {
@@ -578,6 +683,13 @@ router.put('/:id', requireAuth, async (req, res) => {
   const { title, description, categoryId, visibility, status } = req.body || {};
   const updates = [];
   const params = [];
+  const isEditingProject = title !== undefined
+    || description !== undefined
+    || categoryId !== undefined
+    || visibility !== undefined;
+  if (isEditingProject && !['Draft', 'In Progress', 'Changes Requested'].includes(project.status)) {
+    return res.status(409).json({ error: 'Submitted or accepted projects cannot be edited.' });
+  }
 
   if (typeof title === 'string') {
     const cleanTitle = title.trim();
@@ -618,7 +730,8 @@ router.put('/:id', requireAuth, async (req, res) => {
   if (status !== undefined) {
     const nextStatuses = {
       Draft: 'In Progress',
-      'In Progress': 'Submitted'
+      'In Progress': 'Submitted',
+      'Changes Requested': 'In Progress'
     };
     if (status !== nextStatuses[project.status]) {
       return res.status(400).json({ error: 'Project status can only move to its next workflow stage.' });
@@ -626,7 +739,7 @@ router.put('/:id', requireAuth, async (req, res) => {
     updates.push('status = ?');
     params.push(status);
 
-    if (status === 'Submitted' && project.submitted_at === null) {
+    if (status === 'Submitted') {
       updates.push('submitted_at = CURRENT_TIMESTAMP');
     }
     if (status === 'Archived' && project.archived_at === null) {
@@ -657,6 +770,9 @@ router.post('/:id/files', requireAuth, upload.array('files', 10), async (req, re
   }
   if (!allowed || req.user.role !== 'Student') {
     return res.status(403).json({ error: 'Only the project owner can upload files.' });
+  }
+  if (!['Draft', 'In Progress', 'Changes Requested'].includes(project.status)) {
+    return res.status(409).json({ error: 'Submitted or accepted projects cannot receive new files.' });
   }
 
   const uploadedFiles = req.files || [];

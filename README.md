@@ -174,10 +174,12 @@ All responses are JSON. Errors use `{ "error": "message" }`.
 | GET    | `/api/projects`        | Token   | Student project list or teacher-owned project view |
 | POST   | `/api/projects`        | Student | Create a project repository for an enrolled section |
 | GET    | `/api/projects/:id`    | Token   | View one project and its uploaded files          |
-| PUT    | `/api/projects/:id`    | Student | Update project metadata; move status Draft → In Progress → Submitted |
-| POST   | `/api/projects/:id/files` | Student | Upload files to a project repository     |
+| PUT    | `/api/projects/:id`    | Student | Update metadata; move Draft → In Progress → Submitted or Changes Requested → In Progress → Submitted |
+| POST   | `/api/projects/:id/files` | Student | Upload files to an editable project repository |
 | GET    | `/api/projects/:id/files/:fileId` | Token | Download a project file privately |
 | GET   | `/api/projects/:id/tracking` | Token | View milestones, tasks, and project progress |
+| GET    | `/api/projects/:id/reviews` | Owner/assigned teacher | View private review history |
+| POST   | `/api/projects/:id/reviews` | Assigned teacher | Decide Accepted/Changes Requested; include feedback, marks (0–100), rating (1–5) |
 | POST  | `/api/projects/:id/milestones` | Student | Add a project milestone and deadline |
 | PUT/DELETE | `/api/projects/:id/milestones/:milestoneId` | Student | Update or delete a milestone and its tasks |
 | POST  | `/api/projects/:id/milestones/:milestoneId/tasks` | Student | Add a task and due date |
@@ -222,14 +224,16 @@ Implemented tables (see `database/schema.sql` for MySQL and `database/schema.sql
 - **`enrollments`** — `enrollment_id` PK, `section_id` FK, `student_id` FK, unique student/section pair.
 - **`projects`** — `project_id` PK, `student_id` FK, `section_id` FK, `category_id` FK,
   `title`, `description`, `status`, `visibility`, `created_at`, `submitted_at`, `archived_at`.
+- **`reviews`** — `review_id` PK, `project_id` FK, `teacher_id` FK, decision, feedback, marks
+  (0–100), rating (1–5), `reviewed_at`; every review is retained as history.
 - **`project_files`** — `file_id` PK, `project_id` FK, `file_name`, `original_name`, `mime_type`,
   `file_size`, `file_path`, `uploaded_at`.
 - **`milestones`** — `milestone_id` PK, `project_id` FK, `title`, `description`, `deadline`,
   `status`, timestamps.
 - **`milestone_tasks`** — `task_id` PK, `milestone_id` FK, `title`, `due_date`, `status`, timestamps.
 
-Planned tables from the proposal’s ER model, added in later steps: `reviews`, `project_comments`,
-`posts`, `post_comments`, `notifications`.
+Planned tables from the proposal’s ER model, added in later steps: `project_comments`, `posts`,
+`post_comments`, `notifications`.
 
 Project progress is calculated from completed tasks when a project has tasks; otherwise it is
 calculated from completed milestones. Projects with no milestones start at 0%.
@@ -255,7 +259,7 @@ Each step is built and reviewed with the project owner before the next begins.
   private file access to the project owner and section teacher.
 - [x] **Step 4 — Tracking (FR-06, FR-09)**
   Project status workflow, milestones, tasks, deadlines, progress percentage.
-- [ ] **Step 5 — Review workflow (FR-08)**
+- [x] **Step 5 — Review workflow (FR-08; built, awaiting owner review)**
   Submissions, accept/request changes, feedback, marks, ratings, review history.
 - [ ] **Step 6 — Communication (FR-07, FR-11)**
   Project comments and notifications (assignments, submissions, feedback, deadlines).
@@ -307,6 +311,21 @@ Each step is built and reviewed with the project owner before the next begins.
 5. Submit an in-progress project and confirm the status cannot skip directly from Draft to Submitted.
 6. As the section teacher, open Project tracking and confirm the assigned project's tracking is read-only.
 7. Confirm another student or an unrelated teacher cannot read or modify the project's tracking.
+
+## Step 5 verification checklist
+
+1. Run `npm run db:verify` and confirm the `reviews` table exists.
+2. Sign in as a teacher assigned to the project's section; submit a project as its student.
+3. Accept the submitted project with feedback, a mark from 0 to 100, and a rating from 1 to 5.
+   Confirm the student sees the decision and review history and cannot resubmit an accepted project.
+4. On another submitted project, request changes; confirm its student sees the feedback and can
+   start revisions, upload updated files, and submit again.
+5. Confirm the assigned teacher can review the new submission and both reviews remain in history.
+6. Confirm unrelated teachers cannot view or submit reviews, students cannot submit reviews, and
+   invalid marks/ratings are rejected.
+7. Confirm a submitted or accepted project cannot be edited or receive uploads until changes are
+   requested.
+8. Restart the API and confirm review history persists.
 
 ---
 

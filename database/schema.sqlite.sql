@@ -90,6 +90,20 @@ CREATE INDEX IF NOT EXISTS idx_projects_student ON projects (student_id);
 CREATE INDEX IF NOT EXISTS idx_projects_section ON projects (section_id);
 CREATE INDEX IF NOT EXISTS idx_projects_category ON projects (category_id);
 
+CREATE TABLE IF NOT EXISTS reviews (
+  review_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL,
+  teacher_id INTEGER NOT NULL,
+  decision TEXT NOT NULL CHECK (decision IN ('Accepted', 'Changes Requested')),
+  feedback TEXT NOT NULL,
+  marks REAL NOT NULL CHECK (marks >= 0 AND marks <= 100),
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  reviewed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects (project_id) ON DELETE CASCADE,
+  FOREIGN KEY (teacher_id) REFERENCES users (user_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_reviews_project_reviewed ON reviews (project_id, reviewed_at);
+
 CREATE TABLE IF NOT EXISTS project_files (
   file_id INTEGER PRIMARY KEY AUTOINCREMENT,
   project_id INTEGER NOT NULL,

@@ -168,7 +168,7 @@ UX notes:
 | 2 | Courses, categories, sections, enrollments, teacher assignment | FR-03 (base), FR-04 | **Built — awaiting owner review** |
 | 3 | Project repositories + file uploads | FR-02, FR-03 | **Built — awaiting owner review** |
 | 4 | Status workflow, milestones, tasks, deadlines, progress | FR-06, FR-09 | Implemented — MySQL check pending |
-| 5 | Review workflow: accept/request changes, feedback, marks, ratings | FR-08 | Not started |
+| 5 | Review workflow: accept/request changes, feedback, marks, ratings | FR-08 | **Built — awaiting owner review** |
 | 6 | Project comments + notifications | FR-07, FR-11 | Not started |
 | 7 | Public text/photo posts + opinions | FR-13, FR-14 | Not started |
 | 8 | Public dashboard data, search/filter, archive | FR-05, FR-10, FR-12 | Not started |
@@ -488,11 +488,28 @@ Open items: restore MySQL access, configure a Git remote/repository, and get own
 
 ## 9. Next step (only after approval)
 
-**Step 5 — Review workflow (FR-08), after owner review of Step 4:**
+Step 5 is built and awaits owner review. Continue with Step 6 only after explicit approval.
 
-- Add submission review history, teacher accept/request-changes decisions, feedback, marks, and ratings.
-- Keep review access limited to teachers assigned to the project section and the project owner.
-- Update README + append to `context.md`, then stop for approval.
+### 2026-11-18 — Step 5 review workflow work log (assistant)
+
+- Owner prompt (verbatim): "ok its running fine , now you go for step by step development again , and ask me after every dtep you developed"
+- Files added/changed: `backend/src/db.js`, `backend/src/routes/projects.js`,
+  `backend/scripts/verify-db.js`, `database/schema.sql`, `database/schema.sqlite.sql`,
+  `frontend/src/components/ReviewPanel.jsx`, `frontend/src/pages/ProjectsPage.jsx`,
+  `frontend/src/styles.css`, `README.md`, `context.md`.
+- Schema/API changes: added persistent review history; added owner/assigned-teacher review reads and
+  assigned-teacher decisions; review writes update project status transactionally; a Changes Requested
+  project can enter revision and be resubmitted.
+- Decisions: marks are 0–100 with up to two decimals; ratings are whole numbers 1–5; feedback is
+  required. Review records are append-only and private to the project owner and assigned teacher.
+  Submitted and accepted projects cannot be edited or receive uploads until changes are requested.
+- Verification performed: `npm run db:verify` passed (SQLite; 12 tables, 13 departments, 6 users,
+  0 residual reviews); `npm run build`, backend `node --check`, and `git diff --check` passed.
+  Live API integration passed authorization, validation, decision, resubmission, immutable submitted
+  state, and review-history checks.
+- Known issues/follow-ups: MySQL and the manual browser checklist were not exercised in this
+  environment; owner should complete the Step 5 checklist below before approving Step 6.
+- Next step proposal: Step 6 — project comments and notifications, only after explicit owner approval.
 
 ---
 

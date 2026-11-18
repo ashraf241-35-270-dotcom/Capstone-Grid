@@ -155,6 +155,27 @@ ALTER TABLE projects
   MODIFY status ENUM('Draft', 'In Progress', 'Submitted', 'Under Review', 'Accepted', 'Changes Requested', 'Archived')
   NOT NULL DEFAULT 'Draft';
 
+CREATE TABLE IF NOT EXISTS reviews (
+  review_id   INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  project_id  INT UNSIGNED NOT NULL,
+  teacher_id  INT UNSIGNED NOT NULL,
+  decision    ENUM('Accepted', 'Changes Requested') NOT NULL,
+  feedback    TEXT NOT NULL,
+  marks       DECIMAL(5,2) NOT NULL,
+  rating      TINYINT UNSIGNED NOT NULL,
+  reviewed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (review_id),
+  KEY idx_reviews_project_reviewed (project_id, reviewed_at),
+  CONSTRAINT chk_reviews_marks CHECK (marks >= 0 AND marks <= 100),
+  CONSTRAINT chk_reviews_rating CHECK (rating >= 1 AND rating <= 5),
+  CONSTRAINT fk_reviews_project
+    FOREIGN KEY (project_id) REFERENCES projects (project_id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_reviews_teacher
+    FOREIGN KEY (teacher_id) REFERENCES users (user_id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS project_files (
   file_id        INT UNSIGNED NOT NULL AUTO_INCREMENT,
   project_id     INT UNSIGNED NOT NULL,

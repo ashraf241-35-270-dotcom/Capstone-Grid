@@ -38,12 +38,16 @@ async function initSchema() {
   console.log(`[db] Schema ready in ${config.dbClient} database "${databaseName}".`);
 }
 
-async function query(sql, params = []) {
+async function queryOn(executor, sql, params = []) {
   if (config.dbClient === 'mysql') {
-    const [rows] = await pool.execute(sql, params);
-    return rows;
+    const [result] = await executor.execute(sql, params);
+    if (Array.isArray(result)) return result;
+    return {
+      insertId: Number(result.insertId),
+      affectedRows: result.affectedRows,
+      changes: result.affectedRows
+    };
   }
-
   const statement = sqlite.prepare(sql);
   if (/^\s*(SELECT|PRAGMA|WITH)\b/i.test(sql)) {
     return statement.all(...params);
@@ -57,6 +61,37 @@ async function query(sql, params = []) {
   };
 }
 
+async function query(sql, params = []) {
+  return queryOn(pool, sql, params);
+}
+
+async function transaction(callback) {
+  if (config.dbClient === 'mysql') {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const result = await callback((sql, params = []) => queryOn(connection, sql, params));
+      await connection.commit();
+      return result;
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  sqlite.exec('BEGIN IMMEDIATE');
+  try {
+    const result = await callback(query);
+    sqlite.exec('COMMIT');
+    return result;
+  } catch (err) {
+    sqlite.exec('ROLLBACK');
+    throw err;
+  }
+}
+
 async function closePool() {
   if (config.dbClient === 'mysql') {
     await pool.end();
@@ -65,4 +100,4 @@ async function closePool() {
   }
 }
 
-module.exports = { query, initSchema, closePool };
+module.exports = { query, transaction, initSchema, closePool };
