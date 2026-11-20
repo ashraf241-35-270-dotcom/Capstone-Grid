@@ -214,6 +214,41 @@ CREATE TABLE IF NOT EXISTS notifications (
     ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS posts (
+  post_id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id         INT UNSIGNED NOT NULL,
+  content         TEXT NULL,
+  image_file_name VARCHAR(80) NULL,
+  image_mime_type ENUM('image/jpeg', 'image/png', 'image/webp') NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (post_id),
+  UNIQUE KEY uq_posts_image_file_name (image_file_name),
+  KEY idx_posts_created (created_at, post_id),
+  CONSTRAINT chk_posts_content_or_image
+    CHECK ((content IS NOT NULL AND CHAR_LENGTH(TRIM(content)) > 0) OR image_file_name IS NOT NULL),
+  CONSTRAINT chk_posts_image_pair
+    CHECK ((image_file_name IS NULL AND image_mime_type IS NULL) OR (image_file_name IS NOT NULL AND image_mime_type IS NOT NULL)),
+  CONSTRAINT fk_posts_user
+    FOREIGN KEY (user_id) REFERENCES users (user_id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS post_comments (
+  comment_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  post_id    INT UNSIGNED NOT NULL,
+  user_id    INT UNSIGNED NOT NULL,
+  opinion    TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (comment_id),
+  KEY idx_post_comments_post_created (post_id, created_at, comment_id),
+  CONSTRAINT fk_post_comments_post
+    FOREIGN KEY (post_id) REFERENCES posts (post_id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_post_comments_user
+    FOREIGN KEY (user_id) REFERENCES users (user_id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS project_files (
   file_id        INT UNSIGNED NOT NULL AUTO_INCREMENT,
   project_id     INT UNSIGNED NOT NULL,

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import CommunityFeed from '../components/CommunityFeed.jsx';
 
 const FEATURES = [
   { title: 'Sections', text: 'Create and manage teaching groups.' },
@@ -63,6 +64,7 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+      <CommunityFeed user={user} />
     </>
   );
 }

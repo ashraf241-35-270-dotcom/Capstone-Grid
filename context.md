@@ -536,6 +536,40 @@ Step 5 is built and awaits owner review. Continue with Step 6 only after explici
 - Next step proposal: Step 7 — public text/photo posts and post opinions, only after explicit owner
   approval.
 
+### Step 7 — Community posts work log (assistant)
+
+- Owner prompt (verbatim): "yes go for 7"
+- Files added/changed: `database/schema.sql`, `database/schema.sqlite.sql`,
+  `backend/src/routes/posts.js`, `backend/server.js`, `backend/scripts/verify-db.js`,
+  `frontend/src/components/CommunityFeed.jsx`, `frontend/src/pages/LandingPage.jsx`,
+  `frontend/src/styles.css`, `README.md`, and `context.md`.
+- Schema/API changes: added public posts and opinions, authenticated text/photo publishing, public
+  image serving, and a 30-post feed with opinions. Uploads accept PNG/JPEG/WebP, cap at 5 MB, and
+  verify the image signature against the declared type.
+- Decisions: posts and opinions are public to read; publishing and commenting require login. Text is
+  limited to 2,000 characters and opinions to 1,000 characters.
+- Verification performed: `npm run db:verify` passed (SQLite; 16 tables, 13 departments, 6 users,
+  no residual test posts/opinions); frontend production build, backend syntax checks, and
+  `git diff --check` passed. Live API integration passed public/authenticated access, text and image
+  publishing, opinions, image retrieval, invalid-image rejection, and the 5 MB upload limit.
+- Known issues/follow-ups: image validation checks allowed MIME/extension and file signatures, but
+  does not fully decode image contents. MySQL and the manual browser checklist were not exercised;
+  the owner should review the Step 7 checklist before approving the next step.
+- Next step proposal: Step 8 — public project exploration, search/filter, and archive browsing, only
+  after explicit owner approval.
+
+- Owner-requested adjustment: "why not photo visible in exactly, want full real image"
+- Diagnosis and fix: the database contained the full 3,072 × 4,096 JPEG and the API returned it
+  successfully, but the browser left the feed image unloaded with `loading="lazy"`. The newest three
+  posts load images eagerly and remaining feed images stay lazy-loaded.
+- Follow-up from Go Live screenshot: the page origin (`127.0.0.1:5500`) differed from the API origin
+  (`localhost:5000`), and Helmet's default same-origin resource policy blocked embedding images even
+  though opening the URL directly worked. The public image endpoint now allows cross-origin
+  embedding, and photos render inline rather than opening a new tab.
+- Verification: rebuilt the production frontend; the live image route returns HTTP 200 with
+  `Cross-Origin-Resource-Policy: cross-origin`. Owner confirmed the photo displays inline after
+  refreshing Go Live.
+
 ---
 
 ## 10. Append template for the next agent

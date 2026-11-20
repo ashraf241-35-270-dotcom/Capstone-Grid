@@ -10,6 +10,7 @@ const categoryRoutes = require('./src/routes/categories');
 const sectionRoutes = require('./src/routes/sections');
 const projectRoutes = require('./src/routes/projects');
 const notificationRoutes = require('./src/routes/notifications');
+const postRoutes = require('./src/routes/posts');
 
 const app = express();
 
@@ -49,6 +50,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/sections', sectionRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/posts', postRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found.' });

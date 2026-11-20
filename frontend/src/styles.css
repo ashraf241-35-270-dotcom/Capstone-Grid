@@ -790,6 +790,121 @@ button {
   white-space: pre-wrap;
 }
 
+.community-section {
+  background: #f7fafc;
+}
+
+.community-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.65fr) minmax(0, 1.35fr);
+  gap: 30px;
+  align-items: start;
+}
+
+.community-heading {
+  position: sticky;
+  top: 96px;
+}
+
+.community-heading h2 {
+  margin-bottom: 8px;
+}
+
+.community-column,
+.community-posts {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.community-create {
+  display: grid;
+  gap: 14px;
+}
+
+.community-create h3 {
+  margin: 0;
+}
+
+.community-signin p {
+  margin: 0;
+}
+
+.community-post {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.community-post-head,
+.community-post-head > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.community-post-head {
+  justify-content: space-between;
+}
+
+.community-post-head time {
+  text-align: right;
+}
+
+.community-post-content,
+.post-opinion p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.community-post-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: #f1f5f9;
+}
+
+.post-opinions {
+  display: grid;
+  gap: 12px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+}
+
+.post-opinions h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.post-opinion-list {
+  display: grid;
+  gap: 10px;
+}
+
+.post-opinion {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: #f7fafc;
+}
+
+.post-opinion-form {
+  display: grid;
+  gap: 10px;
+}
+
 .roster {
   margin-top: 20px;
   padding-top: 18px;
@@ -1622,6 +1737,14 @@ button {
 
   .dash-grid {
     grid-template-columns: 1fr;
+  }
+
+  .community-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .community-heading {
+    position: static;
   }
 }
 

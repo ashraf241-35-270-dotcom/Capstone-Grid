@@ -130,6 +130,30 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_user_read_created ON notifications (user_id, is_read, created_at);
 
+CREATE TABLE IF NOT EXISTS posts (
+  post_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  content TEXT,
+  image_file_name TEXT UNIQUE,
+  image_mime_type TEXT CHECK (image_mime_type IN ('image/jpeg', 'image/png', 'image/webp')),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CHECK ((content IS NOT NULL AND length(trim(content)) > 0) OR image_file_name IS NOT NULL),
+  CHECK ((image_file_name IS NULL AND image_mime_type IS NULL) OR (image_file_name IS NOT NULL AND image_mime_type IS NOT NULL)),
+  FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_posts_created ON posts (created_at, post_id);
+
+CREATE TABLE IF NOT EXISTS post_comments (
+  comment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  post_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  opinion TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (post_id) REFERENCES posts (post_id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_post_comments_post_created ON post_comments (post_id, created_at, comment_id);
+
 CREATE TABLE IF NOT EXISTS project_files (
   file_id INTEGER PRIMARY KEY AUTOINCREMENT,
   project_id INTEGER NOT NULL,

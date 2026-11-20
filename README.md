@@ -5,7 +5,7 @@ projects**. Students build project repositories and submit work; teachers create
 students, review submissions and record feedback, marks and ratings; everyone can explore public
 projects and community posts.
 
-> **Project status:** Step 4 of 9 complete — project tracking, milestones, tasks, and progress.
+> **Project status:** Step 7 of 9 built — public community posts, photos, and opinions; awaiting owner review.
 > See [Roadmap](#roadmap) and [`context.md`](./context.md) for the step-by-step build plan.
 
 ---
@@ -20,7 +20,8 @@ projects and community posts.
 | DB access      | `node:sqlite` or mysql2                      | Parameterized database queries           |
 | Authentication | JWT + bcryptjs                                | Login tokens, password hashing, RBAC     |
 | Security       | helmet, express-rate-limit, CORS              | Hardening for the API                    |
-| Planned        | Multer (uploads), Nodemailer (email), Jest    | Files, password recovery, tests          |
+| Additional     | Multer (project/community uploads)             | Validated file uploads                   |
+| Planned        | Nodemailer (email), Jest                       | Password recovery, automated tests       |
 
 **Repository layout**
 
@@ -152,7 +153,7 @@ to production. The API generates a random development-only signing key when none
 - Logout is client-side (the JWT is stateless): the frontend discards the token.
 - Protected API routes use `requireAuth`; role-restricted routes use `requireRole('Teacher')`.
 - Public endpoints: `GET /api/health`, `GET /api/departments`, `POST /api/auth/register`,
-  `POST /api/auth/login`.
+  `POST /api/auth/login`, `GET /api/posts`, and `GET /api/posts/:id/image`.
 - Auth endpoints are rate-limited (50 requests / 15 min / IP).
 
 ---
@@ -189,6 +190,10 @@ All responses are JSON. Errors use `{ "error": "message" }`.
 | GET    | `/api/notifications`   | Token   | List the signed-in user's 50 latest notifications and unread count |
 | PUT    | `/api/notifications/:id/read` | Token | Mark one owned notification as read |
 | PUT    | `/api/notifications/read-all` | Token | Mark all owned notifications as read |
+| GET    | `/api/posts`           | Public  | List the 30 latest community posts with opinions |
+| POST   | `/api/posts`           | Token   | Create a text post and/or upload a PNG, JPEG, or WebP image (up to 5 MB) |
+| GET    | `/api/posts/:id/image` | Public  | Serve a post image |
+| POST   | `/api/posts/:id/comments` | Token | Add an opinion to a post (1–1000 characters) |
 | POST   | `/api/auth/register`   | Public  | Create Student/Teacher account                   |
 | POST   | `/api/auth/login`      | Public  | Log in with email + password + role              |
 | GET    | `/api/auth/me`         | Token   | Current user profile                             |
@@ -235,13 +240,15 @@ Implemented tables (see `database/schema.sql` for MySQL and `database/schema.sql
   visible only to the project owner and assigned teacher.
 - **`notifications`** — `notification_id` PK, `user_id` FK, type, message, optional project/section
   links, read state, `created_at`; each user can access only their own notifications.
+- **`posts`** — `post_id` PK, `user_id` FK, optional text and image metadata, `created_at`; public
+  feed access, authenticated publishing.
+- **`post_comments`** — `comment_id` PK, `post_id` and `user_id` FKs, opinion, `created_at`; opinions
+  are public with the post.
 - **`project_files`** — `file_id` PK, `project_id` FK, `file_name`, `original_name`, `mime_type`,
   `file_size`, `file_path`, `uploaded_at`.
 - **`milestones`** — `milestone_id` PK, `project_id` FK, `title`, `description`, `deadline`,
   `status`, timestamps.
 - **`milestone_tasks`** — `task_id` PK, `milestone_id` FK, `title`, `due_date`, `status`, timestamps.
-
-Planned tables from the proposal’s ER model, added in later steps: `posts`, `post_comments`.
 
 Project progress is calculated from completed tasks when a project has tasks; otherwise it is
 calculated from completed milestones. Projects with no milestones start at 0%.
@@ -271,7 +278,7 @@ Each step is built and reviewed with the project owner before the next begins.
   Submissions, accept/request changes, feedback, marks, ratings, review history.
 - [x] **Step 6 — Communication (FR-07, FR-11; built, awaiting owner review)**
   Project comments and notifications (assignments, submissions, feedback, deadlines).
-- [ ] **Step 7 — Community dashboard (FR-13, FR-14)**
+- [x] **Step 7 — Community dashboard (FR-13, FR-14; built, awaiting owner review)**
   Public text/photo posts, image upload, opinions on posts.
 - [ ] **Step 8 — Exploration + archive (FR-05, FR-10, FR-12)**
   Public dashboard data, search/filter by name, student, teacher, category, department, status,
@@ -349,6 +356,22 @@ Each step is built and reviewed with the project owner before the next begins.
    read clears the unread count.
 7. Confirm unrelated users cannot read another user's notifications or another project's comments.
 8. Restart the API and confirm comments and notification read states persist.
+
+## Step 7 verification checklist
+
+1. Run `npm run db:verify` and confirm `posts` and `post_comments` are present.
+2. Open the landing page while signed out; confirm the latest posts and opinions are visible and
+   publishing controls prompt for login.
+3. Sign in, publish a text-only post, and confirm it appears at the top of the public feed.
+4. Publish an image-only post and a text-plus-image post using PNG, JPEG, or WebP files up to 5 MB;
+   confirm each photo stays visible inline in the public feed; the first three posts load photos
+   immediately.
+5. Try an unsupported file type, a mismatched image signature, and an image over 5 MB; confirm each
+   upload is rejected and no failed post appears.
+6. Add an opinion while signed in; confirm it appears on the post. Confirm signed-out users cannot
+   publish or add opinions.
+7. Restart the API and confirm posts and opinions persist; confirm the public image endpoint serves
+   the uploaded image without requiring login.
 
 ---
 
