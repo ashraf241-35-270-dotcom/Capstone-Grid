@@ -1,0 +1,35 @@
+[33mcommit 82152df7f44a932bd099f712e4caa627cd6b5089[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mcapstone-grid3[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/capstone-grid3[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Sanjida Sultana Khushi <sanjidasultanakhushi88@gmail.com>
+Date:   Tue Nov 17 22:17:02 2026 +0600
+
+    Add files via upload
+
+ Capstone-Grid-Complete-Frontend/README.md          |   21 [32m+[m
+ Capstone-Grid-Complete-Frontend/css/style.css      | 1122 [32m++++++++++++++++++++[m
+ Capstone-Grid-Complete-Frontend/index.html         |   83 [32m++[m
+ Capstone-Grid-Complete-Frontend/js/app.js          |   99 [32m++[m
+ Capstone-Grid-Complete-Frontend/js/auth.js         |   22 [32m+[m
+ Capstone-Grid-Complete-Frontend/package-lock.json  |    6 [32m+[m
+ .../shared/archive.html                            |   40 [32m+[m
+ .../shared/explore.html                            |   40 [32m+[m
+ .../shared/notifications.html                      |   40 [32m+[m
+ Capstone-Grid-Complete-Frontend/shared/posts.html  |   40 [32m+[m
+ .../student/create-project.html                    |   40 [32m+[m
+ .../student/dashboard.html                         |   40 [32m+[m
+ Capstone-Grid-Complete-Frontend/student/login.html |   38 [32m+[m
+ .../student/messages.html                          |   40 [32m+[m
+ .../student/milestones.html                        |   40 [32m+[m
+ .../student/profile.html                           |   40 [32m+[m
+ .../student/projects.html                          |   40 [32m+[m
+ .../student/register.html                          |   53 [32m+[m
+ .../teacher/dashboard.html                         |   40 [32m+[m
+ .../teacher/feedback.html                          |   40 [32m+[m
+ Capstone-Grid-Complete-Frontend/teacher/login.html |   38 [32m+[m
+ .../teacher/messages.html                          |   40 [32m+[m
+ .../teacher/profile.html                           |   40 [32m+[m
+ .../teacher/projects.html                          |   40 [32m+[m
+ .../teacher/register.html                          |   59 [32m+[m
+ .../teacher/review.html                            |   40 [32m+[m
+ .../teacher/sections.html                          |   40 [32m+[m
+ .../teacher/students.html                          |   40 [32m+[m
+ 28 files changed, 2261 insertions(+)
