@@ -9,6 +9,15 @@ const { createNotification, notifyProjectParticipants } = require('../notificati
 const router = express.Router();
 const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
 fs.mkdirSync(uploadsDir, { recursive: true });
+const PUBLIC_PROJECTS_FROM = `
+  FROM projects p
+  JOIN users student ON student.user_id = p.student_id
+  LEFT JOIN departments d ON d.department_id = student.department_id
+  LEFT JOIN sections s ON s.section_id = p.section_id
+  LEFT JOIN users teacher ON teacher.user_id = s.teacher_id
+  LEFT JOIN categories c ON c.category_id = p.category_id`;
+const PUBLIC_PROJECTS_WHERE = "p.visibility = 'Public' AND p.status IN ('Accepted', 'Archived')";
+const PUBLIC_PROJECT_PAGE_SIZE = 24;
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),
@@ -122,6 +131,13 @@ async function userCanAccessProject(user, projectId) {
   return { project, allowed: Number(project.student_id) === Number(user.id) };
 }
 
+function parseOptionalId(value) {
+  if (value === undefined || value === '') return { valid: true, value: null };
+  if (typeof value !== 'string') return { valid: false, value: null };
+  const parsed = parseId(value);
+  return { valid: parsed !== null, value: parsed };
+}
+
 function normalizeReview(row) {
   return {
     reviewId: row.review_id,
@@ -182,6 +198,191 @@ router.get('/', requireAuth, async (req, res) => {
   );
 
   return res.json({ projects: projects.map(normalizeProject) });
+});
+
+router.get('/explore', async (req, res) => {
+  const search = req.query.search === undefined ? '' : req.query.search;
+  if (typeof search !== 'string' || search.trim().length > 120) {
+    return res.status(400).json({ error: 'Search text must be 120 characters or fewer.' });
+  }
+
+  const filters = {
+    studentId: parseOptionalId(req.query.studentId),
+    teacherId: parseOptionalId(req.query.teacherId),
+    categoryId: parseOptionalId(req.query.categoryId),
+    departmentId: parseOptionalId(req.query.departmentId)
+  };
+  if (Object.values(filters).some((filter) => !filter.valid)) {
+    return res.status(400).json({ error: 'Filter ids must be positive integers.' });
+  }
+
+  const status = req.query.status === undefined || req.query.status === ''
+    ? null
+    : req.query.status;
+  if (status !== null && !['Accepted', 'Archived'].includes(status)) {
+    return res.status(400).json({ error: 'Status must be Accepted or Archived.' });
+  }
+
+  const pageValue = req.query.page === undefined ? '1' : req.query.page;
+  const page = typeof pageValue === 'string' ? Number(pageValue) : NaN;
+  if (!Number.isInteger(page) || page < 1 || page > 10000) {
+    return res.status(400).json({ error: 'Page must be a positive integer.' });
+  }
+
+  const conditions = [PUBLIC_PROJECTS_WHERE];
+  const params = [];
+  if (search.trim()) {
+    conditions.push('(LOWER(p.title) LIKE ? OR LOWER(p.description) LIKE ?)');
+    const searchTerm = `%${search.trim().toLowerCase()}%`;
+    params.push(searchTerm, searchTerm);
+  }
+  const filterColumns = {
+    studentId: 'p.student_id',
+    teacherId: 's.teacher_id',
+    categoryId: 'p.category_id',
+    departmentId: 'student.department_id'
+  };
+  for (const [name, filter] of Object.entries(filters)) {
+    if (filter.value !== null) {
+      conditions.push(`${filterColumns[name]} = ?`);
+      params.push(filter.value);
+    }
+  }
+  if (status) {
+    conditions.push('p.status = ?');
+    params.push(status);
+  }
+
+  const whereSql = conditions.join(' AND ');
+  const offset = (page - 1) * PUBLIC_PROJECT_PAGE_SIZE;
+  const [totalRows, rows, students, teachers, categories, departments] = await Promise.all([
+    query(`SELECT COUNT(DISTINCT p.project_id) AS total ${PUBLIC_PROJECTS_FROM} WHERE ${whereSql}`, params),
+    query(
+      `SELECT p.project_id, p.student_id, p.section_id, p.category_id, p.title, p.description,
+              p.status, p.visibility, p.created_at, p.submitted_at, p.archived_at,
+              c.name AS category_name, s.section_name, s.semester,
+              student.name AS student_name, teacher.name AS teacher_name, d.name AS department_name,
+              (SELECT COUNT(*) FROM project_files pf WHERE pf.project_id = p.project_id) AS file_count,
+              (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.project_id) AS milestone_count,
+              (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.project_id AND m.status = 'Completed') AS completed_milestone_count,
+              (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id) AS task_count,
+              (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id AND mt.status = 'Completed') AS completed_task_count
+         ${PUBLIC_PROJECTS_FROM}
+        WHERE ${whereSql}
+        ORDER BY CASE WHEN p.status = 'Archived' THEN p.archived_at ELSE p.created_at END DESC,
+                 p.project_id DESC
+        LIMIT ? OFFSET ?`,
+      [...params, PUBLIC_PROJECT_PAGE_SIZE, offset]
+    ),
+    query(
+      `SELECT DISTINCT student.user_id AS id, student.name AS name
+         ${PUBLIC_PROJECTS_FROM}
+        WHERE ${PUBLIC_PROJECTS_WHERE}
+        ORDER BY student.name`
+    ),
+    query(
+      `SELECT DISTINCT teacher.user_id AS id, teacher.name AS name
+         ${PUBLIC_PROJECTS_FROM}
+        WHERE ${PUBLIC_PROJECTS_WHERE} AND teacher.user_id IS NOT NULL
+        ORDER BY teacher.name`
+    ),
+    query(
+      `SELECT DISTINCT c.category_id AS id, c.name AS name
+         ${PUBLIC_PROJECTS_FROM}
+        WHERE ${PUBLIC_PROJECTS_WHERE} AND c.category_id IS NOT NULL
+        ORDER BY c.name`
+    ),
+    query(
+      `SELECT DISTINCT d.department_id AS id, d.name AS name
+         ${PUBLIC_PROJECTS_FROM}
+        WHERE ${PUBLIC_PROJECTS_WHERE} AND d.department_id IS NOT NULL
+        ORDER BY d.name`
+    )
+  ]);
+  const total = Number(totalRows[0]?.total || 0);
+  const archivedIds = rows.filter((row) => row.status === 'Archived').map((row) => row.project_id);
+  const files = archivedIds.length
+    ? await query(
+      `SELECT file_id, project_id, original_name, mime_type, file_size, uploaded_at
+         FROM project_files
+        WHERE project_id IN (${archivedIds.map(() => '?').join(', ')})
+        ORDER BY uploaded_at DESC, file_id DESC`,
+      archivedIds
+    )
+    : [];
+  const filesByProject = new Map();
+  for (const file of files) {
+    const projectFiles = filesByProject.get(file.project_id) || [];
+    projectFiles.push({
+      fileId: file.file_id,
+      name: file.original_name,
+      mimeType: file.mime_type,
+      size: Number(file.file_size),
+      uploadedAt: file.uploaded_at,
+      downloadUrl: `/projects/explore/${file.project_id}/files/${file.file_id}`
+    });
+    filesByProject.set(file.project_id, projectFiles);
+  }
+
+  return res.json({
+    projects: rows.map((row) => ({
+      ...normalizeProject(row),
+      teacherName: row.teacher_name || null,
+      departmentName: row.department_name || null,
+      files: filesByProject.get(row.project_id) || []
+    })),
+    filters: {
+      students,
+      teachers,
+      categories,
+      departments,
+      statuses: ['Accepted', 'Archived']
+    },
+    pagination: {
+      page,
+      pageSize: PUBLIC_PROJECT_PAGE_SIZE,
+      total,
+      pageCount: Math.ceil(total / PUBLIC_PROJECT_PAGE_SIZE)
+    }
+  });
+});
+
+router.get('/explore/:id/files/:fileId', async (req, res) => {
+  const projectId = parseId(req.params.id);
+  const fileId = parseId(req.params.fileId);
+  if (!projectId || !fileId) {
+    return res.status(400).json({ error: 'Invalid project or file id.' });
+  }
+
+  const projects = await query(
+    "SELECT project_id FROM projects WHERE project_id = ? AND visibility = 'Public' AND status = 'Archived' LIMIT 1",
+    [projectId]
+  );
+  if (projects.length === 0) {
+    return res.status(404).json({ error: 'Archived public project not found.' });
+  }
+
+  const rows = await query(
+    'SELECT original_name, file_path, mime_type FROM project_files WHERE file_id = ? AND project_id = ? LIMIT 1',
+    [fileId, projectId]
+  );
+  if (rows.length === 0) {
+    return res.status(404).json({ error: 'Archive file not found.' });
+  }
+
+  const filePath = path.resolve(rows[0].file_path);
+  const relativePath = path.relative(path.resolve(uploadsDir), filePath);
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath) || !fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Archive file is no longer available.' });
+  }
+
+  res.set({
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+    'X-Content-Type-Options': 'nosniff'
+  });
+  return res.download(filePath, rows[0].original_name, {
+    headers: { 'Content-Type': rows[0].mime_type }
+  });
 });
 
 router.post('/', requireAuth, async (req, res) => {
@@ -260,6 +461,10 @@ async function getTrackingProject(req, res, projectId, requireOwner = false) {
   }
   if (requireOwner && req.user.role !== 'Student') {
     res.status(403).json({ error: 'Only the project owner can manage tracking.' });
+    return null;
+  }
+  if (requireOwner && project.status === 'Archived') {
+    res.status(409).json({ error: 'Archived projects cannot be changed.' });
     return null;
   }
 
@@ -880,7 +1085,8 @@ router.put('/:id', requireAuth, async (req, res) => {
     const nextStatuses = {
       Draft: 'In Progress',
       'In Progress': 'Submitted',
-      'Changes Requested': 'In Progress'
+      'Changes Requested': 'In Progress',
+      Accepted: 'Archived'
     };
     if (status !== nextStatuses[project.status]) {
       return res.status(400).json({ error: 'Project status can only move to its next workflow stage.' });

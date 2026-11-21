@@ -8,6 +8,7 @@ const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 const uploadsDir = path.join(__dirname, '..', '..', 'uploads', 'posts');
+const POSTS_PER_PAGE = 30;
 const IMAGE_EXTENSIONS = {
   'image/jpeg': ['.jpg', '.jpeg'],
   'image/png': ['.png'],
@@ -37,6 +38,13 @@ const upload = multer({
 function parseId(value) {
   const id = Number(value);
   return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function parsePage(value) {
+  if (value === undefined) return 1;
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) return null;
+  const page = Number(value);
+  return Number.isSafeInteger(page) ? page : null;
 }
 
 function handleImageUpload(req, res, next) {
@@ -84,15 +92,25 @@ function normalizeComment(comment) {
 }
 
 router.get('/', async (req, res) => {
+  const page = parsePage(req.query.page);
+  if (!page) return res.status(400).json({ error: 'Page must be a positive integer.' });
+
+  const countRows = await query('SELECT COUNT(*) AS total FROM posts');
+  const total = Number(countRows[0].total);
+  const pageCount = Math.ceil(total / POSTS_PER_PAGE);
+  const pagination = { page, pageSize: POSTS_PER_PAGE, pageCount, total };
+  if (page > pageCount) return res.json({ posts: [], pagination });
+
   const rows = await query(
     `SELECT p.post_id, p.user_id, p.content, p.image_file_name, p.created_at,
             u.name AS author_name, u.role AS author_role
        FROM posts p
        JOIN users u ON u.user_id = p.user_id
       ORDER BY p.created_at DESC, p.post_id DESC
-      LIMIT 30`
+      LIMIT ? OFFSET ?`,
+    [POSTS_PER_PAGE, (page - 1) * POSTS_PER_PAGE]
   );
-  if (rows.length === 0) return res.json({ posts: [] });
+  if (rows.length === 0) return res.json({ posts: [], pagination });
 
   const postIds = rows.map((post) => post.post_id);
   const comments = await query(
@@ -120,7 +138,8 @@ router.get('/', async (req, res) => {
       imageUrl: post.image_file_name ? `/posts/${post.post_id}/image` : null,
       createdAt: post.created_at,
       comments: commentsByPost.get(post.post_id) || []
-    }))
+    })),
+    pagination
   });
 });
 

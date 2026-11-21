@@ -91,6 +91,8 @@ function PostCard({ post, user, onCommentAdded, eagerImage }) {
 
 export default function CommunityFeed({ user }) {
   const [posts, setPosts] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ pageSize: 30, pageCount: 0, total: 0 });
   const [content, setContent] = useState('');
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -99,16 +101,18 @@ export default function CommunityFeed({ user }) {
   const imageInput = useRef(null);
 
   const loadPosts = useCallback(async () => {
+    setLoading(true);
     try {
-      const { data } = await api.get('/posts');
+      const { data } = await api.get('/posts', { params: { page } });
       setPosts(data.posts || []);
+      setPagination(data.pagination || { page, pageSize: 30, pageCount: 0, total: 0 });
       setError('');
     } catch (err) {
       setError(getErrorMessage(err, 'Could not load community posts.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     loadPosts();
@@ -131,7 +135,15 @@ export default function CommunityFeed({ user }) {
       const { data } = await api.post('/posts', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      setPosts((current) => [data.post, ...current]);
+      if (page === 1) {
+        setPosts((current) => [data.post, ...current].slice(0, pagination.pageSize));
+        setPagination((current) => {
+          const total = current.total + 1;
+          return { ...current, total, pageCount: Math.ceil(total / current.pageSize) };
+        });
+      } else {
+        setPage(1);
+      }
       setContent('');
       setImage(null);
       if (imageInput.current) imageInput.current.value = '';
@@ -155,8 +167,13 @@ export default function CommunityFeed({ user }) {
       <div className="container community-layout">
         <header className="community-heading">
           <span className="eyebrow eyebrow-dark">Community</span>
-          <h2>Capstone community</h2>
-          <p className="muted">Share updates and exchange opinions with the community.</p>
+          <h2>All public posts</h2>
+          <p className="muted">Browse every public post and opinion, newest first.</p>
+          {!loading && (
+            <span className="pill pill-public">
+              {pagination.total} post{pagination.total === 1 ? '' : 's'}
+            </span>
+          )}
         </header>
 
         <div className="community-column">
@@ -218,6 +235,29 @@ export default function CommunityFeed({ user }) {
                 <h3>No community posts yet</h3>
                 <p className="muted">Be the first to share an update.</p>
               </div>
+            )}
+            {!loading && pagination.pageCount > 1 && (
+              <nav className="explore-pagination" aria-label="Public post pages">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setPage((current) => current - 1)}
+                  disabled={page <= 1}
+                >
+                  Previous
+                </button>
+                <span className="muted small">
+                  Page {page} of {pagination.pageCount}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setPage((current) => current + 1)}
+                  disabled={page >= pagination.pageCount}
+                >
+                  Next
+                </button>
+              </nav>
             )}
           </div>
         </div>

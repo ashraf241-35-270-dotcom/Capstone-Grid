@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import CommunityFeed from '../components/CommunityFeed.jsx';
 
 const FEATURES = [
   { title: 'Sections', text: 'Create and manage teaching groups.' },
@@ -22,6 +21,7 @@ export default function LandingPage() {
               Manage projects, sections, submissions and feedback in one minimal workspace.
             </p>
             <div className="hero-actions">
+              <Link className="btn btn-outline" to="/explore">Explore projects</Link>
               {user ? (
                 <Link className="btn btn-accent" to="/dashboard">Dashboard</Link>
               ) : (
@@ -64,7 +64,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-      <CommunityFeed user={user} />
     </>
   );
 }

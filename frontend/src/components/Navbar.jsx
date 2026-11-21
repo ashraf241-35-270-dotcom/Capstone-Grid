@@ -32,7 +32,7 @@ export default function Navbar() {
         </Link>
 
         <nav className="nav-links" aria-label="Main navigation">
-          <Link to="/">Explore</Link>
+          <Link to="/explore">Explore</Link>
           {user && <Link to="/dashboard">Dashboard</Link>}
           {user && <Link to="/sections">Sections</Link>}
           {user?.role === 'Student' && <Link to="/projects">Projects</Link>}

@@ -87,7 +87,10 @@ Current database on this machine: MySQL 8.0 (`MySQL80` service running) and a se
 
 ---
 
-## 4. Current implementation — Step 2 complete (pending owner review)
+## 4. Original implementation snapshot — Step 2 (historical)
+
+The tables below record the initial Step 2 implementation. Current feature status and later
+decisions are recorded in the step plan and chronological work log below.
 
 ### Backend
 
@@ -155,8 +158,9 @@ UX notes:
 - The academic structure routes are registered in the API and available under `/api/courses`,
   `/api/categories`, and `/api/sections`.
 - The frontend now exposes the academic workflow from the dashboard and navbar.
-- Pending owner action: run `npm run db:setup`, `npm run db:verify`, `npm run dev`, and walk the
-  README “Step 2 verification checklist” for live section-management checks.
+- At the end of Step 2, the owner still needed to run `npm run db:setup`, `npm run db:verify`,
+  `npm run dev`, and walk the README “Step 2 verification checklist” for live section-management
+  checks.
 
 ---
 
@@ -164,15 +168,15 @@ UX notes:
 
 | Step | Scope | Requirements | Status |
 | --- | --- | --- | --- |
-| 1 | Foundation + auth | FR-01 (core) | **Built — awaiting owner review** |
-| 2 | Courses, categories, sections, enrollments, teacher assignment | FR-03 (base), FR-04 | **Built — awaiting owner review** |
-| 3 | Project repositories + file uploads | FR-02, FR-03 | **Built — awaiting owner review** |
-| 4 | Status workflow, milestones, tasks, deadlines, progress | FR-06, FR-09 | Implemented — MySQL check pending |
-| 5 | Review workflow: accept/request changes, feedback, marks, ratings | FR-08 | **Built — awaiting owner review** |
-| 6 | Project comments + notifications | FR-07, FR-11 | **Built — awaiting owner review** |
-| 7 | Public text/photo posts + opinions | FR-13, FR-14 | Not started |
-| 8 | Public dashboard data, search/filter, archive | FR-05, FR-10, FR-12 | Not started |
-| 9 | Password recovery, testing, hardening, docs polish | FR-01 (recovery), NFRs | Not started |
+| 1 | Foundation + auth | FR-01 (core) | Built |
+| 2 | Courses, categories, sections, enrollments, teacher assignment | FR-03 (base), FR-04 | Built |
+| 3 | Project repositories + file uploads | FR-02, FR-03 | Built |
+| 4 | Status workflow, milestones, tasks, deadlines, progress | FR-06, FR-09 | Built |
+| 5 | Review workflow: accept/request changes, feedback, marks, ratings | FR-08 | Built |
+| 6 | Project comments + notifications | FR-07, FR-11 | Built |
+| 7 | Public text/photo posts + opinions | FR-13, FR-14 | Built |
+| 8 | Public dashboard data, search/filter, archive | FR-05, FR-10, FR-12 | Built |
+| 9 | Password recovery, testing, hardening, docs polish | FR-01 (recovery), NFRs | **Built and approved** |
 
 Notes:
 - FR-05 dashboard work is cumulative: Step 1 provides the shell; later steps feed real data.
@@ -205,11 +209,11 @@ Notes:
 
 ## 7. Known gaps / follow-ups
 
-- Step 1 runtime checks depend on the owner completing `npm run db:setup` (root password prompt).
-- No automated tests yet (Jest planned in Step 9).
-- No password recovery endpoints yet (`password_resets` table exists).
+- MySQL and real SMTP delivery need owner-side validation; this environment validated SQLite and
+  mocked email delivery only.
 - No refresh tokens; JWT expiry sends the user back to login.
 - Rate limiter uses in-memory store (fine for single instance; revisit for scale).
+- Demo seed data is optional; do not run the seed against production.
 - No production deployment config yet (build/preview documented).
 
 ---
@@ -569,6 +573,68 @@ Step 5 is built and awaits owner review. Continue with Step 6 only after explici
 - Verification: rebuilt the production frontend; the live image route returns HTTP 200 with
   `Cross-Origin-Resource-Policy: cross-origin`. Owner confirmed the photo displays inline after
   refreshing Go Live.
+
+### Step 8 — Public exploration and archive work log (assistant)
+
+- Owner approval: selected "Yes, start Step 8."
+- Files added/changed: `database/schema.sql`, `database/schema.sqlite.sql`,
+  `backend/src/routes/projects.js`, `frontend/src/pages/ExplorePage.jsx`, `frontend/src/App.jsx`,
+  `frontend/src/components/Navbar.jsx`, `frontend/src/pages/LandingPage.jsx`,
+  `frontend/src/pages/ProjectsPage.jsx`, `frontend/src/styles.css`, `README.md`, and `context.md`.
+- Schema/API changes: added paginated public search/filter for accepted and archived public projects,
+  returning student/teacher/category/department facets. Public downloads are limited to files on
+  public archived projects. Project owners can move accepted work into `Archived`; archived project
+  details and tracking become read-only.
+- Decisions: public exploration never lists private projects or projects outside Accepted/Archived.
+  Search supports project title/description, filters include student, teacher, category, department,
+  and status. Results are paginated at 24 per page. Archived files are downloadable only when the
+  project itself is both public and archived.
+- Verification performed: `npm run db:verify`, frontend production build, backend syntax checks, and
+  `git diff --check` passed. Live API integration passed public/private visibility, all filters,
+  validation, archive transition, archive file authorization/download, and archived tracking
+  immutability. Go Live browser verification confirmed the Explore page, filters, and a public
+  project card render correctly; its temporary fixture was removed.
+- Known issues/follow-ups: live MySQL was not exercised. The owner should review the Step 8 browser
+  checklist before approving the next step.
+- Next step proposal: Step 9 — password recovery and final hardening, only after explicit owner
+  approval.
+
+- Owner feedback: "where the public post? in explore section"
+- Adjustment: moved the community feed from the home page into the public Explore page so community
+  posts and public projects are both visible from the Explore navigation entry.
+
+### Step 9 — Password recovery and final hardening work log (assistant)
+
+- Owner prompt (verbatim): "ok fine go for step 9"
+- Owner review: approved Step 9.
+- Files added/changed: root and backend package manifests/lockfile, `.env.example`, `README.md`,
+  `context.md`, `backend/src/config.js`, `backend/src/mailer.js`, `backend/src/routes/auth.js`,
+  `backend/scripts/seed-demo.js`, `backend/tests/password-recovery.test.js`,
+  `frontend/src/App.jsx`, `frontend/src/pages/LoginPage.jsx`,
+  `frontend/src/pages/ForgotPasswordPage.jsx`, and `frontend/src/pages/ResetPasswordPage.jsx`.
+- Schema/API changes: added rate-limited `POST /api/auth/forgot-password` and
+  `POST /api/auth/reset-password`. Reset tokens are random, stored only as SHA-256 hashes, expire
+  after 30 minutes, and are consumed once. Added SMTP configuration and an optional safe demo seed.
+- Decisions: unknown and registered email addresses receive the same generic accepted response;
+  email delivery failures invalidate the pending token and return a visible service error. SMTP
+  settings remain optional in development and are required for production. The demo seed refuses
+  production, uses `.test` accounts, and does not change passwords for accounts that already exist.
+- Verification performed: `npm test` passed all five password-recovery integration tests against a
+  temporary SQLite database with mocked email delivery; the email-link origin is asserted against
+  `CLIENT_ORIGIN`. The demo seed completed twice against a temporary SQLite database after its final
+  edit. `npm run db:verify` passed against an isolated SQLite database (16 tables, 13 departments);
+  `npm run build`, backend `node --check`, and `git diff --check` passed. `npm audit` reported zero
+  vulnerabilities after upgrading Nodemailer and selecting the compatible Jest release. No live
+  MySQL or SMTP provider was configured.
+- Known issues/follow-ups: real SMTP delivery and live MySQL were not tested. Validate them when
+  configuring the production environment.
+- Next step proposal: no further roadmap step is planned; wait for any owner-requested follow-up.
+
+### 2026-11-21 — Explore posts section refinement (assistant)
+
+- Owner prompt (verbatim): "make a change, i want different section for all public posts , not public projects and post should stay in same explore section"
+- Changes: added separate **Public projects** and **Community posts** views within the existing `/explore` page. The community view now shows all public posts newest-first through 30-post pages; project search/filter controls remain confined to the project view.
+- Verification: pending.
 
 ---
 

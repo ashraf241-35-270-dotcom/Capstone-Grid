@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE INDEX IF NOT EXISTS idx_projects_student ON projects (student_id);
 CREATE INDEX IF NOT EXISTS idx_projects_section ON projects (section_id);
 CREATE INDEX IF NOT EXISTS idx_projects_category ON projects (category_id);
+CREATE INDEX IF NOT EXISTS idx_projects_public_status ON projects (visibility, status, created_at);
 
 CREATE TABLE IF NOT EXISTS reviews (
   review_id INTEGER PRIMARY KEY AUTOINCREMENT,

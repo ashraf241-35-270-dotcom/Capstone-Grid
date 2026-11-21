@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS projects (
   KEY idx_projects_student (student_id),
   KEY idx_projects_section (section_id),
   KEY idx_projects_category (category_id),
+  KEY idx_projects_public_status (visibility, status, created_at),
   CONSTRAINT fk_projects_student
     FOREIGN KEY (student_id) REFERENCES users (user_id)
     ON DELETE CASCADE,

@@ -109,10 +109,17 @@ export default function ProjectsPage() {
   }
 
   async function changeProjectStatus(project) {
-    const nextStatus = project.status === 'Draft' || project.status === 'Changes Requested'
-      ? 'In Progress'
-      : 'Submitted';
-    if (nextStatus === 'Submitted' && !window.confirm('Submit this project for review?')) return;
+    const nextStatus = project.status === 'Accepted'
+      ? 'Archived'
+      : (project.status === 'Draft' || project.status === 'Changes Requested'
+        ? 'In Progress'
+        : 'Submitted');
+    const confirmation = nextStatus === 'Submitted'
+      ? 'Submit this project for review?'
+      : (nextStatus === 'Archived'
+        ? 'Archive this accepted project? It will become read-only.'
+        : null);
+    if (confirmation && !window.confirm(confirmation)) return;
 
     setError('');
     setStatusActionId(project.projectId);
@@ -258,7 +265,7 @@ export default function ProjectsPage() {
                         <div className="section-actions">
                           <span className="pill pill-soon">{project.status}</span>
                           <span className="pill pill-progress">{project.visibility}</span>
-                          {isStudent && ['Draft', 'In Progress', 'Changes Requested'].includes(project.status) && (
+                          {isStudent && ['Draft', 'In Progress', 'Changes Requested', 'Accepted'].includes(project.status) && (
                             <button
                               type="button"
                               className="btn btn-primary btn-sm"
@@ -269,7 +276,9 @@ export default function ProjectsPage() {
                                 ? 'Updating...'
                                 : (project.status === 'Draft'
                                   ? 'Start project'
-                                  : (project.status === 'Changes Requested' ? 'Start revisions' : 'Submit project'))}
+                                  : (project.status === 'Changes Requested'
+                                    ? 'Start revisions'
+                                    : (project.status === 'Accepted' ? 'Archive project' : 'Submit project')))}
                             </button>
                           )}
                         </div>
@@ -290,7 +299,7 @@ export default function ProjectsPage() {
 
                         <ProjectTrackingPanel
                           project={project}
-                          readOnly={!isStudent}
+                          readOnly={!isStudent || project.status === 'Archived'}
                           onProjectChanged={loadProjects}
                         />
 

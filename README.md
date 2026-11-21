@@ -5,7 +5,7 @@ projects**. Students build project repositories and submit work; teachers create
 students, review submissions and record feedback, marks and ratings; everyone can explore public
 projects and community posts.
 
-> **Project status:** Step 7 of 9 built — public community posts, photos, and opinions; awaiting owner review.
+> **Project status:** Step 9 of 9 built and approved — password recovery, tests, demo seed, and operations docs.
 > See [Roadmap](#roadmap) and [`context.md`](./context.md) for the step-by-step build plan.
 
 ---
@@ -21,7 +21,7 @@ projects and community posts.
 | Authentication | JWT + bcryptjs                                | Login tokens, password hashing, RBAC     |
 | Security       | helmet, express-rate-limit, CORS              | Hardening for the API                    |
 | Additional     | Multer (project/community uploads)             | Validated file uploads                   |
-| Planned        | Nodemailer (email), Jest                       | Password recovery, automated tests       |
+| Email + tests  | Nodemailer, Jest, Supertest                    | Password recovery and API integration tests |
 
 **Repository layout**
 
@@ -131,6 +131,12 @@ to production. The API generates a random development-only signing key when none
 | `DB_NAME`        | `capstone_grid`         | MySQL database                                    |
 | `DB_USER`        | `capstone_user`         | MySQL app user (no root access)                    |
 | `DB_PASSWORD`    | —                       | MySQL app password                                |
+| `SMTP_HOST`      | —                       | SMTP host; required to send password reset emails |
+| `SMTP_PORT`      | `587`                   | SMTP server port                                  |
+| `SMTP_SECURE`    | `false`                 | Set `true` for implicit TLS, commonly port 465     |
+| `SMTP_USER`      | —                       | Optional SMTP username; set with `SMTP_PASSWORD`  |
+| `SMTP_PASSWORD`  | —                       | Optional SMTP password; set with `SMTP_USER`      |
+| `MAIL_FROM`      | `SMTP_USER`             | Sender address/name; required in production        |
 
 ### npm scripts (run from the repo root)
 
@@ -141,6 +147,8 @@ to production. The API generates a random development-only signing key when none
 | `npm run preview` | Preview the production frontend build                     |
 | `npm run db:setup`| Optional MySQL database/user setup (prompts for root pw) |
 | `npm run db:verify`| Initialize selected DB and print table counts           |
+| `npm test`        | Run the backend integration tests                       |
+| `npm run db:seed-demo` | Add optional sample accounts and public projects   |
 
 ---
 
@@ -155,6 +163,32 @@ to production. The API generates a random development-only signing key when none
 - Public endpoints: `GET /api/health`, `GET /api/departments`, `POST /api/auth/register`,
   `POST /api/auth/login`, `GET /api/posts`, and `GET /api/posts/:id/image`.
 - Auth endpoints are rate-limited (50 requests / 15 min / IP).
+- Password recovery is rate-limited separately (5 requests / 15 min / IP). Set SMTP configuration
+  and `CLIENT_ORIGIN` to the exact public frontend origin before enabling it in production.
+
+### Password recovery
+
+The login page links to a recovery form. `POST /api/auth/forgot-password` sends a one-time email link
+when SMTP is configured. Existing and unknown addresses receive the same `202` response to avoid
+revealing whether an account exists. Recovery links expire after 30 minutes, are stored as SHA-256
+hashes (never as usable tokens), and can only be used once. A successful reset updates the password;
+the user then logs in normally.
+
+If SMTP is not configured in development, recovery requests return `503` with an administrator
+configuration message. Production startup requires `SMTP_HOST` and `MAIL_FROM` (or `SMTP_USER` as the
+sender); SMTP credentials, when used, must be supplied together. `CLIENT_ORIGIN` determines the
+frontend URL embedded in reset emails. Do not put SMTP credentials in source control or expose the
+reset URL in logs.
+
+```json
+POST /api/auth/forgot-password
+{ "email": "student@university.edu" }
+```
+
+```json
+POST /api/auth/reset-password
+{ "token": "<token-from-email-link>", "password": "a-new-password" }
+```
 
 ---
 
@@ -175,7 +209,9 @@ All responses are JSON. Errors use `{ "error": "message" }`.
 | GET    | `/api/projects`        | Token   | Student project list or teacher-owned project view |
 | POST   | `/api/projects`        | Student | Create a project repository for an enrolled section |
 | GET    | `/api/projects/:id`    | Token   | View one project and its uploaded files          |
-| PUT    | `/api/projects/:id`    | Student | Update metadata; move Draft → In Progress → Submitted or Changes Requested → In Progress → Submitted |
+| GET    | `/api/projects/explore` | Public | Search/filter public accepted and archived projects; paginated (24/page) |
+| GET    | `/api/projects/explore/:id/files/:fileId` | Public | Download a file from a public archived project |
+| PUT    | `/api/projects/:id`    | Student | Update metadata; move Draft → In Progress → Submitted, Changes Requested → In Progress, or Accepted → Archived |
 | POST   | `/api/projects/:id/files` | Student | Upload files to an editable project repository |
 | GET    | `/api/projects/:id/files/:fileId` | Token | Download a project file privately |
 | GET   | `/api/projects/:id/tracking` | Token | View milestones, tasks, and project progress |
@@ -190,12 +226,14 @@ All responses are JSON. Errors use `{ "error": "message" }`.
 | GET    | `/api/notifications`   | Token   | List the signed-in user's 50 latest notifications and unread count |
 | PUT    | `/api/notifications/:id/read` | Token | Mark one owned notification as read |
 | PUT    | `/api/notifications/read-all` | Token | Mark all owned notifications as read |
-| GET    | `/api/posts`           | Public  | List the 30 latest community posts with opinions |
+| GET    | `/api/posts?page=1`    | Public  | List public posts with opinions, 30 per page      |
 | POST   | `/api/posts`           | Token   | Create a text post and/or upload a PNG, JPEG, or WebP image (up to 5 MB) |
 | GET    | `/api/posts/:id/image` | Public  | Serve a post image |
 | POST   | `/api/posts/:id/comments` | Token | Add an opinion to a post (1–1000 characters) |
 | POST   | `/api/auth/register`   | Public  | Create Student/Teacher account                   |
 | POST   | `/api/auth/login`      | Public  | Log in with email + password + role              |
+| POST   | `/api/auth/forgot-password` | Public | Request a one-time email reset link (SMTP required) |
+| POST   | `/api/auth/reset-password` | Public | Replace password with a valid one-time reset token |
 | GET    | `/api/auth/me`         | Token   | Current user profile                             |
 
 **Register body**
@@ -226,8 +264,8 @@ Implemented tables (see `database/schema.sql` for MySQL and `database/schema.sql
 - **`departments`** — `department_id` PK, `name` (unique), `created_at`; seeded with 13 departments.
 - **`users`** — `user_id` PK, `department_id` FK → departments (nullable, `ON DELETE SET NULL`),
   `name`, `email` (unique), `password_hash`, `role` ENUM('Student','Teacher'), `created_at`.
-- **`password_resets`** — `reset_id` PK, `user_id` FK → users (`ON DELETE CASCADE`), `token_hash`,
-  `expires_at`, `used`, `created_at`. (Prepared for FR-01 password recovery.)
+- **`password_resets`** — `reset_id` PK, `user_id` FK → users (`ON DELETE CASCADE`), SHA-256
+  `token_hash`, `expires_at`, `used`, `created_at`; reset tokens expire and are single-use.
 - **`courses`** — `course_id` PK, `department_id` FK, `course_code`, `title`; seeded per department.
 - **`categories`** — `category_id` PK, `name`; seeded with default capstone categories.
 - **`sections`** — `section_id` PK, `course_id` FK, `teacher_id` FK, `section_name`, `semester`.
@@ -245,7 +283,8 @@ Implemented tables (see `database/schema.sql` for MySQL and `database/schema.sql
 - **`post_comments`** — `comment_id` PK, `post_id` and `user_id` FKs, opinion, `created_at`; opinions
   are public with the post.
 - **`project_files`** — `file_id` PK, `project_id` FK, `file_name`, `original_name`, `mime_type`,
-  `file_size`, `file_path`, `uploaded_at`.
+  `file_size`, `file_path`, `uploaded_at`; files remain private except downloadable files attached
+  to a public archived project.
 - **`milestones`** — `milestone_id` PK, `project_id` FK, `title`, `description`, `deadline`,
   `status`, timestamps.
 - **`milestone_tasks`** — `task_id` PK, `milestone_id` FK, `title`, `due_date`, `status`, timestamps.
@@ -255,6 +294,39 @@ calculated from completed milestones. Projects with no milestones start at 0%.
 
 Archived projects will live in `projects` with `status = 'Archived'` and `archived_at` set — no
 separate archive table.
+
+### Tests and optional demo data
+
+Run the backend integration suite with `npm test`. The password-recovery tests use an isolated,
+temporary SQLite database and mock email delivery; they do not verify a live SMTP server.
+
+To create sample accounts and public Explore projects, set `DEMO_PASSWORD` to a new password of
+8–72 bytes and run `npm run db:seed-demo`. The seed refuses to run when `NODE_ENV=production`,
+creates student and teacher demo accounts, and is safe to rerun without changing existing demo
+account passwords. It also creates a downloadable sample report under `backend/uploads/`. The demo
+emails use the reserved `.test` domain and are not real inboxes. Keep the password in a local
+environment variable only; never commit it or save it in `.env`.
+
+PowerShell example:
+
+```powershell
+$env:DEMO_PASSWORD = Read-Host "Demo password (8-72 bytes)"
+try { npm run db:seed-demo } finally { Remove-Item Env:\DEMO_PASSWORD }
+```
+
+### Backup and restore
+
+Database records reference uploaded files, so back up the database and `backend/uploads/` together
+from the same recovery point. Store backups outside the repository in access-controlled, encrypted
+storage; do not commit database dumps, SQLite files, or uploads.
+
+- **SQLite:** stop the API before copying `backend/data/capstone-grid.sqlite` (or the configured
+  `DB_FILE`) and `backend/uploads/`. Restore both before starting the API, then run `npm run db:verify`.
+- **MySQL:** use the organization's approved `mysqldump`/restore procedure for `capstone_grid` and
+  separately back up `backend/uploads/`. Restore the database and matching uploads before starting
+  the API, then run `npm run db:verify`.
+- Test restores periodically. Keep secrets such as `.env` and database/SMTP credentials separate
+  from backups intended for general developer access.
 
 ---
 
@@ -278,14 +350,14 @@ Each step is built and reviewed with the project owner before the next begins.
   Submissions, accept/request changes, feedback, marks, ratings, review history.
 - [x] **Step 6 — Communication (FR-07, FR-11; built, awaiting owner review)**
   Project comments and notifications (assignments, submissions, feedback, deadlines).
-- [x] **Step 7 — Community dashboard (FR-13, FR-14; built, awaiting owner review)**
+- [x] **Step 7 — Community dashboard (FR-13, FR-14; built and approved)**
   Public text/photo posts, image upload, opinions on posts.
-- [ ] **Step 8 — Exploration + archive (FR-05, FR-10, FR-12)**
+- [x] **Step 8 — Exploration + archive (FR-05, FR-10, FR-12; built and approved)**
   Public dashboard data, search/filter by name, student, teacher, category, department, status,
-  archived project browsing.
-- [ ] **Step 9 — Completion + hardening (FR-01 recovery, NFRs)**
-  Password recovery via Nodemailer, tests (Jest), validation review, seed demo data, API docs,
-  backup notes.
+  accepted-project and archived-project browsing, public archive file downloads.
+- [x] **Step 9 — Completion + hardening (FR-01 recovery, NFRs; built and approved)**
+  Password recovery via Nodemailer, focused Jest/Supertest tests, optional demo seed, API docs,
+  backup notes, and final validation.
 
 ---
 
@@ -360,8 +432,8 @@ Each step is built and reviewed with the project owner before the next begins.
 ## Step 7 verification checklist
 
 1. Run `npm run db:verify` and confirm `posts` and `post_comments` are present.
-2. Open the landing page while signed out; confirm the latest posts and opinions are visible and
-   publishing controls prompt for login.
+2. Open Explore while signed out, choose **Community posts**, and confirm posts are separate from
+   public projects. Verify the feed can page through every public post and opinions remain visible.
 3. Sign in, publish a text-only post, and confirm it appears at the top of the public feed.
 4. Publish an image-only post and a text-plus-image post using PNG, JPEG, or WebP files up to 5 MB;
    confirm each photo stays visible inline in the public feed; the first three posts load photos
@@ -372,6 +444,32 @@ Each step is built and reviewed with the project owner before the next begins.
    publish or add opinions.
 7. Restart the API and confirm posts and opinions persist; confirm the public image endpoint serves
    the uploaded image without requiring login.
+
+## Step 8 verification checklist
+
+1. Run `npm run db:verify` and confirm the public-project search index is present.
+2. Open `/explore` while signed out; confirm public accepted projects appear and filter controls load.
+3. Search by project name/description and filter by student, teacher, category, department, and
+   status; confirm results and pagination update.
+4. Confirm private projects and public projects that are not accepted or archived are never listed.
+5. As the owner of an accepted project, archive it from the project list; confirm its archive date is
+   saved and its tracking/repository updates are read-only.
+6. Choose the Archive status filter; confirm public archived projects and their downloadable files
+   appear. Confirm private archived project files are not accessible publicly.
+7. Restart the API and confirm archived state and public project/file visibility persist.
+
+## Step 9 verification checklist
+
+1. Run `npm test`; confirm the password-recovery integration tests pass.
+2. With SMTP unset in development, request a reset and confirm the API reports that recovery is not
+   configured. Configure SMTP and a valid `CLIENT_ORIGIN` before testing delivery.
+3. Request a reset for a registered account and an unknown address; confirm both return the same
+   generic response. Check the email link targets the configured frontend.
+4. Confirm a reset token works once, fails after use or expiry, and the new password works at login.
+5. If testing demo data, set `DEMO_PASSWORD` locally, run `npm run db:seed-demo`, and confirm the
+   accepted and archived projects appear in Explore. Never run the demo seed in production.
+6. Follow the backup instructions to verify a database and upload restore in a non-production
+   environment.
 
 ---
 
@@ -386,3 +484,4 @@ Each step is built and reviewed with the project owner before the next begins.
 | Port 5000/5173 already in use | Change `PORT` in `.env` (also update `vite.config.js` proxy) or stop the other process. |
 | Departments fail to load in registration | Run `npm run dev -w capstone-grid-api`, open the page through Go Live (not `file://`), and reload. |
 | Login works but dashboard redirects back | Clear `localStorage` and log in again; check the API logs for JWT errors. |
+| Password recovery returns `503` | Configure `SMTP_HOST`, `MAIL_FROM`, and paired SMTP credentials if required; verify `CLIENT_ORIGIN` and restart the API. |
