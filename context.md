@@ -634,7 +634,7 @@ Step 5 is built and awaits owner review. Continue with Step 6 only after explici
 
 - Owner prompt (verbatim): "make a change, i want different section for all public posts , not public projects and post should stay in same explore section"
 - Changes: added separate **Public projects** and **Community posts** views within the existing `/explore` page. The community view now shows all public posts newest-first through 30-post pages; project search/filter controls remain confined to the project view.
-- Verification: pending.
+- Verification: `npm test` passed 2 suites / 7 tests, including 31-post pagination and invalid-page cases. `npm run build` passed. Browser verification confirmed the section switcher stays on `/explore`, hides project filters in the post view, and keeps public posts separate from project results.
 
 ---
 
