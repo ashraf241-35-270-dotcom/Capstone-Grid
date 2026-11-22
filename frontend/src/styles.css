@@ -735,6 +735,18 @@ button {
   margin: 0;
 }
 
+.review-update-action {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 14px;
+}
+
+.review-update-action p {
+  margin: 0;
+}
+
 .review-form,
 .review-list {
   display: grid;
@@ -1276,6 +1288,68 @@ button {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.section-project-records {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.section-project-record-table {
+  min-width: 1000px;
+}
+
+.section-project-record-table .review-scores-compact {
+  margin-top: 0;
+}
+
+.project-condition {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.project-condition-draft,
+.project-condition-archived,
+.project-condition-other {
+  background: #eef1f5;
+  color: #475569;
+}
+
+.project-condition-in-progress {
+  background: #eaf2ff;
+  color: #2457a6;
+}
+
+.project-condition-submitted {
+  background: var(--warning-soft);
+  color: #8a5a00;
+}
+
+.project-condition-changes-requested {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.project-condition-accepted {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.teacher-project-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  max-width: 640px;
+  margin-bottom: 20px;
+}
+
+.teacher-project-filters .field {
+  margin: 0;
 }
 
 .empty-state {

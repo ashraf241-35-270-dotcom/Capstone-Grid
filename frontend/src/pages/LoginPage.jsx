@@ -10,7 +10,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   const [role, setRole] = useState('Student');
-  const [email, setEmail] = useState(location.state?.email || '');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -32,9 +32,12 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login({ email: email.trim(), password, role });
+      setEmail('');
+      setPassword('');
       navigate(location.state?.from || '/dashboard', { replace: true });
     } catch (err) {
       setError(getErrorMessage(err, 'Could not log in. Please try again.'));
+      setPassword('');
     } finally {
       setSubmitting(false);
     }
@@ -70,18 +73,18 @@ export default function LoginPage() {
           )}
           {error && <div className="alert alert-error" role="alert">{error}</div>}
 
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={handleSubmit} noValidate autoComplete="off">
             <RoleSelect value={role} onChange={setRole} />
 
             <label className="field">
               <span className="field-label">Email address</span>
               <input
                 type="email"
-                name="email"
-                autoComplete="email"
+                name="login-email-entry"
+                autoComplete="off"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@university.edu"
+                placeholder="Example: you@university.edu"
                 required
               />
             </label>
@@ -90,11 +93,11 @@ export default function LoginPage() {
               <span className="field-label">Password</span>
               <input
                 type="password"
-                name="password"
-                autoComplete="current-password"
+                name="login-password-entry"
+                autoComplete="new-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="Your password"
+                placeholder="Enter your password"
                 required
               />
             </label>

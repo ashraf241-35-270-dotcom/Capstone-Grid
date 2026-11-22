@@ -197,6 +197,22 @@ function normalizeReview(row) {
 
 router.get('/', requireAuth, async (req, res) => {
   if (req.user.role === 'Teacher') {
+    let sectionId = null;
+    if (req.query.sectionId !== undefined) {
+      sectionId = parseId(req.query.sectionId);
+      if (!sectionId) {
+        return res.status(400).json({ error: 'sectionId must be a positive integer.' });
+      }
+
+      const ownedSections = await query(
+        'SELECT section_id FROM sections WHERE section_id = ? AND teacher_id = ? LIMIT 1',
+        [sectionId, req.user.id]
+      );
+      if (ownedSections.length === 0) {
+        return res.status(404).json({ error: 'Section not found.' });
+      }
+    }
+
     const projects = await query(
       `SELECT p.project_id, p.student_id, p.section_id, p.category_id, p.title, p.description,
               p.status, p.visibility, p.created_at, p.submitted_at, p.archived_at,
@@ -214,12 +230,16 @@ router.get('/', requireAuth, async (req, res) => {
          LEFT JOIN categories c ON c.category_id = p.category_id
          LEFT JOIN sections s ON s.section_id = p.section_id
          JOIN users u ON u.user_id = p.student_id
-        WHERE s.teacher_id = ?
+        WHERE s.teacher_id = ?${sectionId ? ' AND p.section_id = ?' : ''}
         ORDER BY p.created_at DESC`,
-      [req.user.id]
+      sectionId ? [req.user.id, sectionId] : [req.user.id]
     );
 
     return res.json({ projects: await normalizeProjectsWithFiles(projects) });
+  }
+
+  if (req.query.sectionId !== undefined) {
+    return res.status(403).json({ error: 'Only teachers can filter projects by section.' });
   }
 
   const projects = await query(
@@ -992,14 +1012,19 @@ router.post('/:id/reviews', requireAuth, async (req, res) => {
   if (req.user.role !== 'Teacher') {
     return res.status(403).json({ error: 'Only the assigned teacher can review this project.' });
   }
-  if (project.status !== 'Submitted') {
-    return res.status(409).json({ error: 'Only submitted projects can be reviewed.' });
+  const isInitialReview = project.status === 'Submitted';
+  const isReviewUpdate = ['Accepted', 'Changes Requested'].includes(project.status);
+  if (!isInitialReview && !isReviewUpdate) {
+    return res.status(409).json({ error: 'Only submitted or previously reviewed projects can be reviewed.' });
   }
 
   const { decision, feedback, marks, rating } = req.body || {};
   const cleanFeedback = typeof feedback === 'string' ? feedback.trim() : '';
-  if (!['Accepted', 'Changes Requested'].includes(decision)) {
+  if (isInitialReview && !['Accepted', 'Changes Requested'].includes(decision)) {
     return res.status(400).json({ error: 'Decision must be Accepted or Changes Requested.' });
+  }
+  if (isReviewUpdate && decision !== project.status) {
+    return res.status(409).json({ error: 'Updating marks and feedback cannot change the existing decision.' });
   }
   if (cleanFeedback.length < 1 || cleanFeedback.length > 5000) {
     return res.status(400).json({ error: 'Feedback must be between 1 and 5000 characters.' });
@@ -1012,11 +1037,23 @@ router.post('/:id/reviews', requireAuth, async (req, res) => {
   }
 
   const reviewId = await transaction(async (execute) => {
-    const updated = await execute(
-      'UPDATE projects SET status = ? WHERE project_id = ? AND status = ?',
-      [decision, projectId, 'Submitted']
-    );
-    if (updated.affectedRows === 0) return null;
+    if (isInitialReview) {
+      const updated = await execute(
+        'UPDATE projects SET status = ? WHERE project_id = ? AND status = ?',
+        [decision, projectId, 'Submitted']
+      );
+      if (updated.affectedRows === 0) return null;
+    } else {
+      const currentProjects = await execute(
+        'SELECT status FROM projects WHERE project_id = ? LIMIT 1',
+        [projectId]
+      );
+      const existingReviews = await execute(
+        'SELECT review_id FROM reviews WHERE project_id = ? LIMIT 1',
+        [projectId]
+      );
+      if (currentProjects[0]?.status !== project.status || existingReviews.length === 0) return null;
+    }
 
     const result = await execute(
       'INSERT INTO reviews (project_id, teacher_id, decision, feedback, marks, rating) VALUES (?, ?, ?, ?, ?, ?)',
@@ -1025,14 +1062,14 @@ router.post('/:id/reviews', requireAuth, async (req, res) => {
     await createNotification(execute, {
       userId: project.student_id,
       type: 'feedback',
-      message: `New review feedback is available for "${project.title}".`,
+      message: `${isInitialReview ? 'New' : 'Updated'} review feedback is available for "${project.title}".`,
       projectId
     });
     return result.insertId;
   });
 
   if (reviewId === null) {
-    return res.status(409).json({ error: 'This project has already been reviewed.' });
+    return res.status(409).json({ error: 'This project changed before the review could be saved. Refresh and try again.' });
   }
 
   const rows = await query(

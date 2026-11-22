@@ -26,8 +26,12 @@ app.use('/api/notifications', notificationRoutes);
 let studentId;
 let teacherId;
 let projectId;
+let sectionId;
+let otherProjectId;
+let otherSectionId;
 let studentToken;
 let teacherToken;
+let otherTeacherToken;
 
 describe('project file uploads', () => {
   beforeAll(async () => {
@@ -48,9 +52,17 @@ describe('project file uploads', () => {
       'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
       ['Upload Test Teacher', 'upload-teacher@example.test', 'test-hash', 'Teacher']
     );
+    const otherTeacher = await query(
+      'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
+      ['Other Test Teacher', 'other-teacher@example.test', 'test-hash', 'Teacher']
+    );
     const section = await query(
       'INSERT INTO sections (course_id, teacher_id, section_name, semester) VALUES (?, ?, ?, ?)',
       [course.insertId, teacher.insertId, 'UPLOAD-01', 'TEST']
+    );
+    const otherSection = await query(
+      'INSERT INTO sections (course_id, teacher_id, section_name, semester) VALUES (?, ?, ?, ?)',
+      [course.insertId, teacher.insertId, 'UPLOAD-02', 'TEST']
     );
     const project = await query(
       `INSERT INTO projects (student_id, section_id, category_id, title, description, status)
@@ -64,16 +76,35 @@ describe('project file uploads', () => {
         'In Progress'
       ]
     );
+    const otherProject = await query(
+      `INSERT INTO projects (student_id, section_id, category_id, title, description, status)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        student.insertId,
+        otherSection.insertId,
+        categories[0].category_id,
+        'Other Section Project',
+        'Temporary project used to verify section filtering.',
+        'Draft'
+      ]
+    );
 
     studentId = student.insertId;
     teacherId = teacher.insertId;
     projectId = project.insertId;
+    sectionId = section.insertId;
+    otherProjectId = otherProject.insertId;
+    otherSectionId = otherSection.insertId;
     studentToken = jwt.sign(
       { id: studentId, role: 'Student', name: 'Upload Test Student' },
       config.jwtSecret
     );
     teacherToken = jwt.sign(
       { id: teacherId, role: 'Teacher', name: 'Upload Test Teacher' },
+      config.jwtSecret
+    );
+    otherTeacherToken = jwt.sign(
+      { id: otherTeacher.insertId, role: 'Teacher', name: 'Other Test Teacher' },
       config.jwtSecret
     );
     await query(
@@ -167,5 +198,83 @@ describe('project file uploads', () => {
       .get(`/api${upload.body.files[0].downloadUrl}`)
       .set('Authorization', `Bearer ${teacherToken}`)
       .expect(200);
+  });
+
+  test('filters teacher projects by an owned section', async () => {
+    const firstSection = await request(app)
+      .get(`/api/projects?sectionId=${sectionId}`)
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .expect(200);
+    expect(firstSection.body.projects.map((project) => project.projectId)).toEqual([projectId]);
+
+    const secondSection = await request(app)
+      .get(`/api/projects?sectionId=${otherSectionId}`)
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .expect(200);
+    expect(secondSection.body.projects.map((project) => project.projectId)).toEqual([otherProjectId]);
+
+    await request(app)
+      .get('/api/projects?sectionId=invalid')
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .expect(400);
+
+    await request(app)
+      .get(`/api/projects?sectionId=${sectionId}`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(403);
+
+    await request(app)
+      .get(`/api/projects?sectionId=${sectionId}`)
+      .set('Authorization', `Bearer ${otherTeacherToken}`)
+      .expect(404);
+  });
+
+  test('lets the assigned teacher update marks and feedback while preserving review history', async () => {
+    await request(app)
+      .post(`/api/projects/${projectId}/reviews`)
+      .set('Authorization', `Bearer ${otherTeacherToken}`)
+      .send({
+        decision: 'Accepted',
+        feedback: 'Unauthorized update.',
+        marks: 1,
+        rating: 1
+      })
+      .expect(403);
+
+    const update = await request(app)
+      .post(`/api/projects/${projectId}/reviews`)
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .send({
+        decision: 'Accepted',
+        feedback: 'Updated final feedback.',
+        marks: 96.25,
+        rating: 5
+      })
+      .expect(201);
+    expect(update.body.review).toMatchObject({
+      decision: 'Accepted',
+      feedback: 'Updated final feedback.',
+      marks: 96.25,
+      rating: 5
+    });
+
+    const history = await request(app)
+      .get(`/api/projects/${projectId}/reviews`)
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .expect(200);
+    expect(history.body.reviews).toHaveLength(3);
+    expect(history.body.reviews[0].reviewId).toBe(update.body.review.reviewId);
+    expect(history.body.reviews[2].feedback).toBe('First review.');
+
+    await request(app)
+      .post(`/api/projects/${projectId}/reviews`)
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .send({
+        decision: 'Changes Requested',
+        feedback: 'This cannot change the prior decision.',
+        marks: 90,
+        rating: 4
+      })
+      .expect(409);
   });
 });

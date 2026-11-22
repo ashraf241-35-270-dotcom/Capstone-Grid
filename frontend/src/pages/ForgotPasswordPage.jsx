@@ -16,6 +16,7 @@ export default function ForgotPasswordPage() {
     try {
       const { data } = await api.post('/auth/forgot-password', { email: email.trim() });
       setMessage(data.message);
+      setEmail('');
     } catch (err) {
       setError(getErrorMessage(err, 'Could not request a password reset.'));
     } finally {
@@ -40,17 +41,17 @@ export default function ForgotPasswordPage() {
           </header>
           {message && <div className="alert alert-success" role="status">{message}</div>}
           {error && <div className="alert alert-error" role="alert">{error}</div>}
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} autoComplete="off">
             <label className="field">
               <span className="field-label">Email address</span>
               <input
                 type="email"
-                name="email"
-                autoComplete="email"
+                name="recovery-email-entry"
+                autoComplete="off"
                 maxLength={190}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@university.edu"
+                placeholder="Example: you@university.edu"
                 required
               />
             </label>

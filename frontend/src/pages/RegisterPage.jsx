@@ -99,8 +99,7 @@ export default function RegisterPage() {
       });
       navigate('/login', {
         state: {
-          message: 'Account created successfully. Log in to continue.',
-          email: email.trim()
+          message: 'Account created successfully. Log in to continue.'
         }
       });
     } catch (err) {

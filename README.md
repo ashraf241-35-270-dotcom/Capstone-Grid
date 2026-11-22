@@ -157,6 +157,8 @@ to production. The API generates a random development-only signing key when none
 - Accounts have exactly one role: **`Student`** or **`Teacher`** (capitalized in DB, JWT and API).
 - Passwords are hashed with bcrypt (cost 12). Passwords must be 8–72 bytes.
 - Login requires the role to match the account, as specified (“separate Student and Teacher login”).
+- Login and password-recovery fields start blank and do not request browser autofill; the login
+  password is cleared after every attempt. Example address formats are shown as placeholders.
 - JWT payload: `{ id, role, name }`, sent as `Authorization: Bearer <token>`.
 - Logout is client-side (the JWT is stateless): the frontend discards the token.
 - Protected API routes use `requireAuth`; role-restricted routes use `requireRole('Teacher')`.
@@ -190,6 +192,13 @@ POST /api/auth/reset-password
 { "token": "<token-from-email-link>", "password": "a-new-password" }
 ```
 
+### Teacher project records
+
+Each teacher section card has its own **Project records** table, scoped to that section. The
+teacher project workspace also has section and view filters; the dashboard's Review queue shows only
+submitted projects, while Marks and feedback shows reviewed projects. Teachers can add an updated
+mark, rating, and feedback entry to a reviewed project without erasing its previous review history.
+
 ---
 
 ## API reference (implemented)
@@ -206,7 +215,7 @@ All responses are JSON. Errors use `{ "error": "message" }`.
 | POST   | `/api/sections`        | Teacher | Create a course section                          |
 | POST   | `/api/sections/:id/enrollments` | Teacher | Enroll a student by email         |
 | DELETE | `/api/sections/:id/enrollments/:studentId` | Teacher | Remove a student from a section |
-| GET    | `/api/projects`        | Token   | Student project list or teacher-owned project view, with latest review mark/rating summary |
+| GET    | `/api/projects`        | Token   | Student project list or teacher-owned project view, with latest review scores; teachers may filter by owned `sectionId` |
 | POST   | `/api/projects`        | Student | Create a project repository for an enrolled section |
 | GET    | `/api/projects/:id`    | Token   | View one project and its uploaded files          |
 | GET    | `/api/projects/explore` | Public | Search/filter accepted and archived public projects with latest review scores; paginated (24/page) |
@@ -218,7 +227,7 @@ All responses are JSON. Errors use `{ "error": "message" }`.
 | GET    | `/api/projects/:id/comments` | Owner/assigned teacher | View project conversation |
 | POST   | `/api/projects/:id/comments` | Owner/assigned teacher | Add a project message |
 | GET    | `/api/projects/:id/reviews` | Owner/assigned teacher | View private review history |
-| POST   | `/api/projects/:id/reviews` | Assigned teacher | Decide Accepted/Changes Requested; include feedback, marks (0–100), rating (1–5) |
+| POST   | `/api/projects/:id/reviews` | Assigned teacher | Review a submission or append updated feedback, marks (0–100), and rating (1–5) without erasing prior history |
 | POST  | `/api/projects/:id/milestones` | Student | Add a project milestone and deadline |
 | PUT/DELETE | `/api/projects/:id/milestones/:milestoneId` | Student | Update or delete a milestone and its tasks |
 | POST  | `/api/projects/:id/milestones/:milestoneId/tasks` | Student | Add a task and due date |

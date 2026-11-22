@@ -670,6 +670,21 @@ Step 5 is built and awaits owner review. Continue with Step 6 only after explici
   syntax checks, and `git diff --check` passed. Score cards use accessible rating text and adapt to
   narrow screens.
 
+### 2026-11-22 — Blank login and recovery fields (assistant)
+
+- Owner prompt (verbatim): "solve two issue,after a login the text filds should be deleted and for new login attempt it should stay blank or may provide input type sample"
+- Changes: login and password-recovery forms disable autofill and start with empty values; login email is no longer carried from account registration. Login passwords clear after each attempt, and recovery email clears after a successful request. Example email format is provided as a placeholder.
+- Verification: `npm run build` passed and `git diff --check` passed. No focused frontend test runner is configured. An unrelated password-recovery test run passed 4/5 tests; its bcrypt-heavy reset/login test exceeded Jest's default 5-second timeout.
+
+### 2026-11-22 — Section-wise teacher project records (assistant)
+
+- Owner prompt (verbatim): "add feature that , teacher should have a record table section dedicately section wise , on students projects and its condition"
+- Clarification: "this should stay on indivisual section name record side of dashboard etc, where this should get by section filter , and reveiw and feedback directing to same page make more specifik and teacher should have access to update marks and ratings."
+- Follow-up: "this enroll feature should not have on records sections, enough to stay only on roster section"
+- Changes: moved the table into each teacher-owned section card and added an ownership-checked `sectionId` project filter. Rows show student/project, condition, progress, review score, and files, with a specific review/update link. Dashboard Review queue and Marks and feedback now select distinct filtered views; teachers can append updated marks/rating/feedback while retaining review history.
+- Follow-up change: enrollment stays only inside the separately labeled Roster and enrollment panel. Opening Project records closes the roster panel, and opening the roster closes project records.
+- Verification: `npm run build`, `node --check backend/src/routes/projects.js`, and `git diff --check` passed. The focused `project-uploads.test.js` suite passed all 3 tests, covering section scoping/authorization and review updates that preserve prior history.
+
 ---
 
 ## 10. Append template for the next agent

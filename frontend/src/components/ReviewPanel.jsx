@@ -7,6 +7,7 @@ export default function ReviewPanel({ project, isTeacher, onProjectChanged }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [editingReview, setEditingReview] = useState(false);
   const [form, setForm] = useState({
     decision: '',
     feedback: '',
@@ -40,13 +41,14 @@ export default function ReviewPanel({ project, isTeacher, onProjectChanged }) {
 
     try {
       const { data } = await api.post(`/projects/${project.projectId}/reviews`, {
-        decision: form.decision,
+        decision: form.decision || project.status,
         feedback: form.feedback,
         marks: Number(form.marks),
         rating: Number(form.rating)
       });
       setReviews((current) => [data.review, ...current]);
       setForm({ decision: '', feedback: '', marks: '', rating: '' });
+      setEditingReview(false);
       await onProjectChanged();
     } catch (err) {
       setError(getErrorMessage(err, 'Could not save this review.'));
@@ -55,8 +57,30 @@ export default function ReviewPanel({ project, isTeacher, onProjectChanged }) {
     }
   }
 
+  function startEditingReview() {
+    const latestReview = reviews[0];
+    if (!latestReview) return;
+    setForm({
+      decision: project.status,
+      feedback: latestReview.feedback,
+      marks: String(latestReview.marks),
+      rating: String(latestReview.rating)
+    });
+    setEditingReview(true);
+    setError('');
+  }
+
+  const canUpdateReview = isTeacher
+    && ['Accepted', 'Changes Requested'].includes(project.status)
+    && reviews.length > 0;
+
   return (
-    <section className="review-panel" aria-label="Project reviews">
+    <section
+      className="review-panel"
+      id={`project-reviews-${project.projectId}`}
+      aria-label="Project reviews"
+      tabIndex="-1"
+    >
       <div className="review-panel-head">
         <h4>Reviews &amp; feedback</h4>
         <span className="pill">{reviews.length}</span>
@@ -64,20 +88,35 @@ export default function ReviewPanel({ project, isTeacher, onProjectChanged }) {
 
       {error && <div className="alert alert-error" role="alert">{error}</div>}
 
-      {isTeacher && project.status === 'Submitted' && (
+      {canUpdateReview && !editingReview && (
+        <div className="review-update-action">
+          <p className="muted small">Update marks or feedback without losing the previous review entry.</p>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={startEditingReview}>
+            Update marks and feedback
+          </button>
+        </div>
+      )}
+
+      {isTeacher && (project.status === 'Submitted' || editingReview) && (
         <form className="review-form" onSubmit={handleSubmit}>
-          <label className="field">
-            <span className="field-label">Decision</span>
-            <select
-              value={form.decision}
-              onChange={(event) => setForm({ ...form, decision: event.target.value })}
-              required
-            >
-              <option value="">Choose a decision</option>
-              <option value="Accepted">Accept project</option>
-              <option value="Changes Requested">Request changes</option>
-            </select>
-          </label>
+          {project.status === 'Submitted' ? (
+            <label className="field">
+              <span className="field-label">Decision</span>
+              <select
+                value={form.decision}
+                onChange={(event) => setForm({ ...form, decision: event.target.value })}
+                required
+              >
+                <option value="">Choose a decision</option>
+                <option value="Accepted">Accept project</option>
+                <option value="Changes Requested">Request changes</option>
+              </select>
+            </label>
+          ) : (
+            <p className="muted small">
+              Current decision: <strong>{project.status}</strong>. Saving adds an updated review entry to the history.
+            </p>
+          )}
 
           <label className="field">
             <span className="field-label">Feedback</span>
@@ -120,8 +159,13 @@ export default function ReviewPanel({ project, isTeacher, onProjectChanged }) {
           </div>
 
           <button className="btn btn-primary btn-sm" type="submit" disabled={submitting}>
-            {submitting ? 'Saving review...' : 'Submit review'}
+            {submitting ? 'Saving review...' : (editingReview ? 'Save updated review' : 'Submit review')}
           </button>
+          {editingReview && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingReview(false)}>
+              Cancel
+            </button>
+          )}
         </form>
       )}
 

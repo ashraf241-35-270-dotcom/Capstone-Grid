@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api, { getErrorMessage } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import ProjectConditionBadge from '../components/ProjectConditionBadge.jsx';
+import ReviewScoreSummary from '../components/ReviewScoreSummary.jsx';
 
 const SEMESTERS = (() => {
   const year = new Date().getFullYear();
@@ -22,6 +25,10 @@ function SectionCard({ section, isTeacher, onChanged }) {
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [projectRecords, setProjectRecords] = useState([]);
+  const [projectRecordsOpen, setProjectRecordsOpen] = useState(false);
+  const [loadingProjectRecords, setLoadingProjectRecords] = useState(false);
+  const [projectRecordsError, setProjectRecordsError] = useState('');
 
   async function loadRoster() {
     setLoadingRoster(true);
@@ -36,9 +43,35 @@ function SectionCard({ section, isTeacher, onChanged }) {
     }
   }
 
+  async function loadProjectRecords() {
+    setLoadingProjectRecords(true);
+    setProjectRecordsError('');
+    try {
+      const { data } = await api.get('/projects', { params: { sectionId: section.section_id } });
+      setProjectRecords(data.projects || []);
+    } catch (err) {
+      setProjectRecordsError(getErrorMessage(err, 'Could not load project records for this section.'));
+    } finally {
+      setLoadingProjectRecords(false);
+    }
+  }
+
+  function toggleProjectRecords() {
+    const nextOpen = !projectRecordsOpen;
+    setProjectRecordsOpen(nextOpen);
+    if (nextOpen) {
+      setOpen(false);
+      loadProjectRecords();
+    }
+  }
+
   function toggleRoster() {
-    if (!open && !roster) loadRoster();
-    setOpen(!open);
+    const nextOpen = !open;
+    setOpen(nextOpen);
+    if (nextOpen) {
+      setProjectRecordsOpen(false);
+      if (!roster) loadRoster();
+    }
   }
 
   async function handleEnroll(event) {
@@ -105,6 +138,9 @@ function SectionCard({ section, isTeacher, onChanged }) {
           <button type="button" className="btn btn-ghost btn-sm" onClick={toggleRoster}>
             {open ? 'Hide roster' : 'Manage roster'}
           </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={toggleProjectRecords}>
+            {projectRecordsOpen ? 'Hide project records' : 'Project records'}
+          </button>
           <button type="button" className="btn btn-danger btn-sm" onClick={handleDelete} disabled={deleting}>
             {deleting ? 'Deleting...' : 'Delete'}
           </button>
@@ -114,9 +150,83 @@ function SectionCard({ section, isTeacher, onChanged }) {
       )}
 
       {actionError && <div className="alert alert-error">{actionError}</div>}
+      {projectRecordsError && <div className="alert alert-error" role="alert">{projectRecordsError}</div>}
+
+      {isTeacher && projectRecordsOpen && (
+        <section className="section-project-records" aria-label={`Project records for ${section.section_name}`}>
+          <div className="project-files-heading">
+            <h4>Student project records</h4>
+            <span className="pill">{projectRecords.length}</span>
+          </div>
+          {loadingProjectRecords ? (
+            <p className="muted small">Loading this section's project records...</p>
+          ) : projectRecordsError ? null : projectRecords.length === 0 ? (
+            <p className="muted small">No student projects in this section yet.</p>
+          ) : (
+            <div className="roster-table-wrap">
+              <table className="roster-table section-project-record-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Project</th>
+                    <th>Condition</th>
+                    <th>Progress</th>
+                    <th>Review</th>
+                    <th>Files</th>
+                    <th><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projectRecords.map((project) => {
+                    const params = new URLSearchParams({
+                      sectionId: String(section.section_id),
+                      projectId: String(project.projectId),
+                      focus: 'review'
+                    });
+                    if (project.status === 'Submitted') params.set('view', 'review');
+                    else if (project.reviewSummary) params.set('view', 'feedback');
+
+                    return (
+                      <tr key={project.projectId}>
+                        <td>{project.studentName || 'Unknown student'}</td>
+                        <td>{project.title}</td>
+                        <td><ProjectConditionBadge status={project.status} /></td>
+                        <td>{project.progressPercent}%</td>
+                        <td>
+                          {project.reviewSummary ? (
+                            <ReviewScoreSummary
+                              marks={project.reviewSummary.marks}
+                              rating={project.reviewSummary.rating}
+                              compact
+                            />
+                          ) : <span className="muted small">Not reviewed</span>}
+                        </td>
+                        <td>{project.fileCount}</td>
+                        <td>
+                          <Link className="btn btn-ghost btn-sm" to={`/projects?${params.toString()}`}>
+                            {project.status === 'Submitted'
+                              ? 'Review submission'
+                              : (['Accepted', 'Changes Requested'].includes(project.status) && project.reviewSummary
+                                ? 'Update marks & feedback'
+                                : (project.reviewSummary ? 'View feedback' : 'View project'))}
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       {isTeacher && open && (
         <div className="roster">
+          <div className="project-files-heading">
+            <h4>Roster and enrollment</h4>
+            <span className="pill">{roster?.length ?? section.student_count}</span>
+          </div>
           <form className="roster-form" onSubmit={handleEnroll}>
             <input
               type="email"

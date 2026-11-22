@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import api, { getErrorMessage } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import ProjectTrackingPanel from '../components/ProjectTrackingPanel.jsx';
@@ -10,8 +10,14 @@ import ReviewScoreSummary from '../components/ReviewScoreSummary.jsx';
 export default function ProjectsPage() {
   const { user } = useAuth();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isStudent = user.role === 'Student';
   const highlightedLocation = useRef(null);
+  const requestedView = searchParams.get('view');
+  const activeView = isStudent || !['review', 'feedback'].includes(requestedView)
+    ? 'all'
+    : requestedView;
+  const sectionFilter = isStudent ? '' : (searchParams.get('sectionId') || '');
 
   const [projects, setProjects] = useState([]);
   const [sections, setSections] = useState([]);
@@ -30,24 +36,47 @@ export default function ProjectsPage() {
   const [uploadingId, setUploadingId] = useState(null);
   const [statusActionId, setStatusActionId] = useState(null);
   const [fileError, setFileError] = useState('');
+  const visibleProjects = projects.filter((project) => {
+    if (sectionFilter && String(project.sectionId) !== sectionFilter) return false;
+    if (activeView === 'review') return project.status === 'Submitted';
+    if (activeView === 'feedback') return Boolean(project.reviewSummary);
+    return true;
+  });
+  const projectPageTitle = isStudent
+    ? 'My capstone projects'
+    : (activeView === 'review'
+      ? 'Review queue'
+      : (activeView === 'feedback' ? 'Marks and feedback' : 'Assigned project tracking'));
+  const projectPageDescription = isStudent
+    ? 'Create projects, manage milestones, and track progress.'
+    : (activeView === 'review'
+      ? 'Review submitted projects and record a decision, marks, rating, and feedback.'
+      : (activeView === 'feedback'
+        ? 'See existing decisions and scores, then update marks and feedback while preserving review history.'
+        : 'View milestones, tasks, deadlines, and progress for your students.'));
 
   useEffect(() => {
     if (loading || highlightedLocation.current === location.key) return;
-    const projectId = location.state?.highlightProjectId;
-    if (!projectId) return;
-
-    const fileSection = document.getElementById(`project-files-${projectId}`);
-    if (!fileSection) return;
+    const uploadProjectId = location.state?.highlightProjectId;
+    const projectId = searchParams.get('projectId');
+    const target = uploadProjectId
+      ? document.getElementById(`project-files-${uploadProjectId}`)
+      : (projectId
+        ? document.getElementById(searchParams.get('focus') === 'review'
+          ? `project-reviews-${projectId}`
+          : `project-record-${projectId}`)
+        : null);
+    if (!target) return;
     highlightedLocation.current = location.key;
-    fileSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    fileSection.focus({ preventScroll: true });
-    fileSection.classList.add('project-upload-highlight');
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.focus({ preventScroll: true });
+    if (uploadProjectId) target.classList.add('project-upload-highlight');
     const timer = window.setTimeout(
-      () => fileSection.classList.remove('project-upload-highlight'),
+      () => target.classList.remove('project-upload-highlight'),
       5000
     );
     return () => window.clearTimeout(timer);
-  }, [loading, location.key, location.state, projects]);
+  }, [loading, location.key, location.state, location.search, searchParams, projects]);
 
   const loadProjects = useCallback(async () => {
     const { data } = await api.get('/projects');
@@ -61,13 +90,14 @@ export default function ProjectsPage() {
       try {
         const responses = await Promise.all([
           api.get('/projects'),
-          ...(isStudent ? [api.get('/sections'), api.get('/categories')] : [])
+          api.get('/sections'),
+          ...(isStudent ? [api.get('/categories')] : [])
         ]);
 
         if (!active) return;
         setProjects(responses[0].data.projects || []);
+        setSections(responses[1].data.sections || []);
         if (isStudent) {
-          setSections(responses[1].data.sections || []);
           setCategories(responses[2].data.categories || []);
         }
       } catch (err) {
@@ -80,6 +110,17 @@ export default function ProjectsPage() {
     load();
     return () => { active = false; };
   }, [isStudent]);
+
+  function updateProjectFilter(name, value) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (value) next.set(name, value);
+      else next.delete(name);
+      next.delete('projectId');
+      next.delete('focus');
+      return next;
+    }, { replace: true });
+  }
 
   async function handleCreate(event) {
     event.preventDefault();
@@ -181,14 +222,10 @@ export default function ProjectsPage() {
         <div className="container page-head-inner">
           <div>
             <span className="eyebrow eyebrow-dark">Project workspace</span>
-            <h1>{isStudent ? 'My capstone projects' : 'Assigned project tracking'}</h1>
-            <p className="muted">
-              {isStudent
-                ? 'Create projects, manage milestones, and track progress.'
-                : 'View milestones, tasks, deadlines, and progress for your students.'}
-            </p>
+            <h1>{projectPageTitle}</h1>
+            <p className="muted">{projectPageDescription}</p>
           </div>
-          <span className="pill pill-public">{projects.length} {projects.length === 1 ? 'project' : 'projects'}</span>
+          <span className="pill pill-public">{visibleProjects.length} {visibleProjects.length === 1 ? 'project' : 'projects'}</span>
         </div>
       </section>
 
@@ -273,24 +310,56 @@ export default function ProjectsPage() {
               </form>}
 
               <div className="section-list-wrap">
+                {!isStudent && (
+                  <div className="teacher-project-filters">
+                    <label className="field">
+                      <span className="field-label">Project view</span>
+                      <select
+                        value={activeView}
+                        onChange={(event) => updateProjectFilter('view', event.target.value === 'all' ? '' : event.target.value)}
+                      >
+                        <option value="all">All projects</option>
+                        <option value="review">Review queue</option>
+                        <option value="feedback">Marks and feedback</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span className="field-label">Section</span>
+                      <select value={sectionFilter} onChange={(event) => updateProjectFilter('sectionId', event.target.value)}>
+                        <option value="">All sections</option>
+                        {sections.map((section) => (
+                          <option key={section.section_id} value={section.section_id}>
+                            {section.course_code} · {section.section_name} ({section.semester})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
                 <div className="list-head">
-                  <h2>{isStudent ? 'Project list' : 'Assigned projects'}</h2>
-                  <span className="pill">{projects.length}</span>
+                  <h2>{isStudent ? 'Project list' : projectPageTitle}</h2>
+                  <span className="pill">{visibleProjects.length}</span>
                 </div>
 
-                {projects.length === 0 ? (
+                {visibleProjects.length === 0 ? (
                   <div className="empty-state">
-                    <h3>No projects yet</h3>
+                    <h3>{projects.length === 0 ? 'No projects yet' : 'No matching projects'}</h3>
                     <p className="muted">
-                      {isStudent
-                        ? 'Create your first project repository to start tracking progress.'
-                        : 'Projects from your assigned sections will appear here.'}
+                      {projects.length === 0
+                        ? (isStudent
+                          ? 'Create your first project repository to start tracking progress.'
+                          : 'Projects from your assigned sections will appear here.')
+                        : (activeView === 'review'
+                          ? 'No submitted projects are waiting for review in this section.'
+                          : (activeView === 'feedback'
+                            ? 'No reviewed projects match this section filter.'
+                            : 'No projects match this section filter.'))}
                     </p>
                   </div>
                 ) : (
                   <div className="section-list">
-                    {projects.map((project) => (
-                      <article className="section-card" key={project.projectId}>
+                    {visibleProjects.map((project) => (
+                      <article className="section-card" id={`project-record-${project.projectId}`} tabIndex="-1" key={project.projectId}>
                         <div className="section-card-head">
                           <div>
                             <span className="section-code">{project.sectionName || 'Section'} · {project.status}</span>

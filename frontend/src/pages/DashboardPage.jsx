@@ -16,15 +16,15 @@ const TEACHER_CARDS = [
   },
   {
     title: 'Review queue',
-    text: 'Review submissions, accept work or request changes.',
+    text: 'Open submitted projects awaiting your decision.',
     status: 'Available',
-    to: '/projects'
+    to: '/projects?view=review'
   },
   {
     title: 'Marks and feedback',
-    text: 'Record feedback, marks and ratings for every project.',
+    text: 'View and update review marks, ratings and feedback.',
     status: 'Available',
-    to: '/projects'
+    to: '/projects?view=feedback'
   }
 ];
 
