@@ -17,12 +17,14 @@ const TEACHER_CARDS = [
   {
     title: 'Review queue',
     text: 'Review submissions, accept work or request changes.',
-    status: 'Coming next'
+    status: 'Available',
+    to: '/projects'
   },
   {
     title: 'Marks and feedback',
     text: 'Record feedback, marks and ratings for every project.',
-    status: 'Coming next'
+    status: 'Available',
+    to: '/projects'
   }
 ];
 
@@ -42,7 +44,8 @@ const STUDENT_CARDS = [
   {
     title: 'Feedback',
     text: 'See supervisor decisions, marks, ratings and comments.',
-    status: 'Coming next'
+    status: 'Available',
+    to: '/projects'
   }
 ];
 

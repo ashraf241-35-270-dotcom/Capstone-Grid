@@ -636,6 +636,40 @@ Step 5 is built and awaits owner review. Continue with Step 6 only after explici
 - Changes: added separate **Public projects** and **Community posts** views within the existing `/explore` page. The community view now shows all public posts newest-first through 30-post pages; project search/filter controls remain confined to the project view.
 - Verification: `npm test` passed 2 suites / 7 tests, including 31-post pagination and invalid-page cases. `npm run build` passed. Browser verification confirmed the section switcher stays on `/explore`, hides project filters in the post view, and keeps public posts separate from project results.
 
+### 2026-11-21 — Project upload visibility and teacher alert (assistant)
+
+- Owner prompt (verbatim): "whwn a student upload files on projets , it should be visible or add instant near this and teacher should get this in front"
+- Owner review: approved this change.
+- Changes: project file names, sizes, and upload times now appear beside the upload control for students and in an emphasized "Latest student uploads" list for assigned teachers. Teacher download buttons use the authenticated API. Each successful upload creates an unread teacher notification that links to and highlights the relevant file list; notifications refresh every 15 seconds.
+- Verification: `npm test` passed all three suites (8 tests), covering upload persistence, secure
+  downloads for the assigned teacher, file visibility to both project participants, and the teacher
+  notification. `npm run build`, backend syntax checks, and `git diff --check` passed.
+
+### 2026-11-22 — Compact project conversations (assistant)
+
+- Owner prompt (verbatim): "project conversations section should stay below than uploaded file section .there should have a see all option to see all msgs otherwise stay minimise and visisble first 2 msg"
+- Changes: moved the conversation below the project's uploaded files and upload control. It now shows the two newest messages by default, with an accessible See all/Show fewer toggle; newly sent messages expand the list.
+- Verification: `npm test` passed all three backend suites (8 tests), `npm run build` passed, and
+  `git diff --check` passed. The two-message preview uses the existing newest-first conversation
+  order; newly sent messages expand so the sender sees the response immediately.
+
+### 2026-11-22 — Dashboard status labels (assistant)
+
+- Owner prompt (verbatim): "showing comimng next so how u finished the implementation steps?"
+- Changes: marked the existing teacher Review queue, teacher Marks and feedback, and student Feedback dashboard cards Available and linked them to the implemented project workspace.
+- Verification: `npm run build` and `git diff --check` passed; confirmed no "Coming next" label remains in the dashboard card definitions.
+
+### 2026-11-22 — Review score visibility (assistant)
+
+- Owner prompt (verbatim): "okay its fine , but want the marks and rating should vsisible more clearly specifik in iconic way. and in reveiw and feed back section their should have dedicated vsisible and section for these"
+- Owner follow-up: "every where marks and rating shoulkd visible iconicly in projects"
+- Owner follow-up: "in public post rating should be visible also for all"
+- Changes: the Reviews & feedback panel and student/teacher project cards show marks and ratings in separate icon-led summary cards, including a five-star visual and accessible rating text. The latest review's scores are now also included on accepted/archived public project cards in Explore.
+- Verification: all three backend test suites passed (8 tests), including checks that student,
+  teacher, and public Explore project lists return the latest mark/rating. `npm run build`, backend
+  syntax checks, and `git diff --check` passed. Score cards use accessible rating text and adapt to
+  narrow screens.
+
 ---
 
 ## 10. Append template for the next agent

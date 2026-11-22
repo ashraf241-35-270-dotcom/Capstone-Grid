@@ -88,8 +88,49 @@ function normalizeProject(row) {
     fileCount: Number(row.file_count || 0),
     milestoneCount,
     taskCount,
-    progressPercent: progressTotal ? Math.round((progressComplete / progressTotal) * 100) : 0
+    progressPercent: progressTotal ? Math.round((progressComplete / progressTotal) * 100) : 0,
+    reviewSummary: row.latest_review_marks === null || row.latest_review_marks === undefined
+      ? null
+      : {
+        marks: Number(row.latest_review_marks),
+        rating: Number(row.latest_review_rating)
+      }
   };
+}
+
+function normalizeProjectFile(file) {
+  return {
+    fileId: file.file_id,
+    name: file.original_name,
+    mimeType: file.mime_type,
+    size: Number(file.file_size),
+    uploadedAt: file.uploaded_at,
+    downloadUrl: `/projects/${file.project_id}/files/${file.file_id}`
+  };
+}
+
+async function normalizeProjectsWithFiles(rows) {
+  if (rows.length === 0) return [];
+
+  const projectIds = rows.map((project) => project.project_id);
+  const files = await query(
+    `SELECT file_id, project_id, original_name, mime_type, file_size, uploaded_at
+       FROM project_files
+      WHERE project_id IN (${projectIds.map(() => '?').join(', ')})
+      ORDER BY uploaded_at DESC, file_id DESC`,
+    projectIds
+  );
+  const filesByProject = new Map();
+  for (const file of files) {
+    const projectFiles = filesByProject.get(file.project_id) || [];
+    projectFiles.push(normalizeProjectFile(file));
+    filesByProject.set(file.project_id, projectFiles);
+  }
+
+  return rows.map((project) => ({
+    ...normalizeProject(project),
+    files: filesByProject.get(project.project_id) || []
+  }));
 }
 
 async function findProject(projectId) {
@@ -103,7 +144,9 @@ async function findProject(projectId) {
             (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.project_id) AS milestone_count,
             (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.project_id AND m.status = 'Completed') AS completed_milestone_count,
             (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id) AS task_count,
-            (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id AND mt.status = 'Completed') AS completed_task_count
+            (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id AND mt.status = 'Completed') AS completed_task_count,
+            (SELECT r.marks FROM reviews r WHERE r.project_id = p.project_id ORDER BY r.reviewed_at DESC, r.review_id DESC LIMIT 1) AS latest_review_marks,
+            (SELECT r.rating FROM reviews r WHERE r.project_id = p.project_id ORDER BY r.reviewed_at DESC, r.review_id DESC LIMIT 1) AS latest_review_rating
        FROM projects p
        LEFT JOIN categories c ON c.category_id = p.category_id
        LEFT JOIN sections s ON s.section_id = p.section_id
@@ -164,7 +207,9 @@ router.get('/', requireAuth, async (req, res) => {
               (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.project_id) AS milestone_count,
               (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.project_id AND m.status = 'Completed') AS completed_milestone_count,
               (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id) AS task_count,
-              (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id AND mt.status = 'Completed') AS completed_task_count
+              (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id AND mt.status = 'Completed') AS completed_task_count,
+              (SELECT r.marks FROM reviews r WHERE r.project_id = p.project_id ORDER BY r.reviewed_at DESC, r.review_id DESC LIMIT 1) AS latest_review_marks,
+              (SELECT r.rating FROM reviews r WHERE r.project_id = p.project_id ORDER BY r.reviewed_at DESC, r.review_id DESC LIMIT 1) AS latest_review_rating
          FROM projects p
          LEFT JOIN categories c ON c.category_id = p.category_id
          LEFT JOIN sections s ON s.section_id = p.section_id
@@ -174,7 +219,7 @@ router.get('/', requireAuth, async (req, res) => {
       [req.user.id]
     );
 
-    return res.json({ projects: projects.map(normalizeProject) });
+    return res.json({ projects: await normalizeProjectsWithFiles(projects) });
   }
 
   const projects = await query(
@@ -187,7 +232,9 @@ router.get('/', requireAuth, async (req, res) => {
             (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.project_id) AS milestone_count,
             (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.project_id AND m.status = 'Completed') AS completed_milestone_count,
             (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id) AS task_count,
-            (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id AND mt.status = 'Completed') AS completed_task_count
+            (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id AND mt.status = 'Completed') AS completed_task_count,
+            (SELECT r.marks FROM reviews r WHERE r.project_id = p.project_id ORDER BY r.reviewed_at DESC, r.review_id DESC LIMIT 1) AS latest_review_marks,
+            (SELECT r.rating FROM reviews r WHERE r.project_id = p.project_id ORDER BY r.reviewed_at DESC, r.review_id DESC LIMIT 1) AS latest_review_rating
        FROM projects p
        LEFT JOIN categories c ON c.category_id = p.category_id
        LEFT JOIN sections s ON s.section_id = p.section_id
@@ -197,7 +244,7 @@ router.get('/', requireAuth, async (req, res) => {
     [req.user.id]
   );
 
-  return res.json({ projects: projects.map(normalizeProject) });
+  return res.json({ projects: await normalizeProjectsWithFiles(projects) });
 });
 
 router.get('/explore', async (req, res) => {
@@ -266,7 +313,9 @@ router.get('/explore', async (req, res) => {
               (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.project_id) AS milestone_count,
               (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.project_id AND m.status = 'Completed') AS completed_milestone_count,
               (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id) AS task_count,
-              (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id AND mt.status = 'Completed') AS completed_task_count
+              (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id AND mt.status = 'Completed') AS completed_task_count,
+              (SELECT r.marks FROM reviews r WHERE r.project_id = p.project_id ORDER BY r.reviewed_at DESC, r.review_id DESC LIMIT 1) AS latest_review_marks,
+              (SELECT r.rating FROM reviews r WHERE r.project_id = p.project_id ORDER BY r.reviewed_at DESC, r.review_id DESC LIMIT 1) AS latest_review_rating
          ${PUBLIC_PROJECTS_FROM}
         WHERE ${whereSql}
         ORDER BY CASE WHEN p.status = 'Archived' THEN p.archived_at ELSE p.created_at END DESC,
@@ -1130,19 +1179,27 @@ router.put('/:id', requireAuth, async (req, res) => {
 });
 
 router.post('/:id/files', requireAuth, upload.array('files', 10), async (req, res) => {
+  async function removeUploadedFiles() {
+    await Promise.all((req.files || []).map((file) => fs.promises.unlink(file.path)));
+  }
+
   const projectId = parseId(req.params.id);
   if (!projectId) {
+    await removeUploadedFiles();
     return res.status(400).json({ error: 'Invalid project id.' });
   }
 
   const { project, allowed } = await userCanAccessProject(req.user, projectId);
   if (!project) {
+    await removeUploadedFiles();
     return res.status(404).json({ error: 'Project not found.' });
   }
   if (!allowed || req.user.role !== 'Student') {
+    await removeUploadedFiles();
     return res.status(403).json({ error: 'Only the project owner can upload files.' });
   }
   if (!['Draft', 'In Progress', 'Changes Requested'].includes(project.status)) {
+    await removeUploadedFiles();
     return res.status(409).json({ error: 'Submitted or accepted projects cannot receive new files.' });
   }
 
@@ -1160,19 +1217,46 @@ router.post('/:id/files', requireAuth, upload.array('files', 10), async (req, re
     path.join(uploadsDir, file.filename)
   ]);
 
-  for (const insert of inserts) {
-    await query(
-      'INSERT INTO project_files (project_id, file_name, original_name, mime_type, file_size, file_path) VALUES (?, ?, ?, ?, ?, ?)',
-      insert
-    );
+  try {
+    await transaction(async (execute) => {
+      for (const insert of inserts) {
+        await execute(
+          'INSERT INTO project_files (project_id, file_name, original_name, mime_type, file_size, file_path) VALUES (?, ?, ?, ?, ?, ?)',
+          insert
+        );
+      }
+
+      const teachers = await execute(
+        'SELECT teacher_id FROM sections WHERE section_id = ? LIMIT 1',
+        [project.section_id]
+      );
+      const teacherId = teachers[0]?.teacher_id;
+      if (teacherId) {
+        const fileNames = uploadedFiles.slice(0, 2).map((file) => file.originalname.slice(0, 80));
+        const remainingCount = uploadedFiles.length - fileNames.length;
+        const fileSummary = [
+          fileNames.join(', '),
+          remainingCount > 0 ? `and ${remainingCount} more` : ''
+        ].filter(Boolean).join(' ');
+        await createNotification(execute, {
+          userId: teacherId,
+          type: 'submission',
+          message: `${(project.student_name || 'A student').slice(0, 120)} uploaded ${uploadedFiles.length} file${uploadedFiles.length === 1 ? '' : 's'} to "${project.title}": ${fileSummary}.`,
+          projectId
+        });
+      }
+    });
+  } catch (err) {
+    await removeUploadedFiles();
+    throw err;
   }
 
   const files = await query(
-    'SELECT file_id, project_id, file_name, original_name, mime_type, file_size, file_path, uploaded_at FROM project_files WHERE project_id = ? ORDER BY uploaded_at DESC',
+    'SELECT file_id, project_id, original_name, mime_type, file_size, uploaded_at FROM project_files WHERE project_id = ? ORDER BY uploaded_at DESC, file_id DESC',
     [projectId]
   );
 
-  return res.status(201).json({ files });
+  return res.status(201).json({ files: files.map(normalizeProjectFile) });
 });
 
 router.get('/:id/files/:fileId', requireAuth, async (req, res) => {

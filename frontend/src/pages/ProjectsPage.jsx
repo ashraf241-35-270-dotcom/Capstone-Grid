@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import api, { getErrorMessage } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import ProjectTrackingPanel from '../components/ProjectTrackingPanel.jsx';
 import ReviewPanel from '../components/ReviewPanel.jsx';
 import ProjectCommentsPanel from '../components/ProjectCommentsPanel.jsx';
+import ReviewScoreSummary from '../components/ReviewScoreSummary.jsx';
 
 export default function ProjectsPage() {
   const { user } = useAuth();
+  const location = useLocation();
   const isStudent = user.role === 'Student';
+  const highlightedLocation = useRef(null);
 
   const [projects, setProjects] = useState([]);
   const [sections, setSections] = useState([]);
@@ -25,6 +29,25 @@ export default function ProjectsPage() {
   const [formError, setFormError] = useState('');
   const [uploadingId, setUploadingId] = useState(null);
   const [statusActionId, setStatusActionId] = useState(null);
+  const [fileError, setFileError] = useState('');
+
+  useEffect(() => {
+    if (loading || highlightedLocation.current === location.key) return;
+    const projectId = location.state?.highlightProjectId;
+    if (!projectId) return;
+
+    const fileSection = document.getElementById(`project-files-${projectId}`);
+    if (!fileSection) return;
+    highlightedLocation.current = location.key;
+    fileSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    fileSection.focus({ preventScroll: true });
+    fileSection.classList.add('project-upload-highlight');
+    const timer = window.setTimeout(
+      () => fileSection.classList.remove('project-upload-highlight'),
+      5000
+    );
+    return () => window.clearTimeout(timer);
+  }, [loading, location.key, location.state, projects]);
 
   const loadProjects = useCallback(async () => {
     const { data } = await api.get('/projects');
@@ -108,6 +131,25 @@ export default function ProjectsPage() {
     }
   }
 
+  async function downloadProjectFile(projectId, file) {
+    setFileError('');
+    try {
+      const { data } = await api.get(`/projects/${projectId}/files/${file.fileId}`, {
+        responseType: 'blob'
+      });
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      setFileError(getErrorMessage(err, 'Could not download the project file.'));
+    }
+  }
+
   async function changeProjectStatus(project) {
     const nextStatus = project.status === 'Accepted'
       ? 'Archived'
@@ -153,6 +195,7 @@ export default function ProjectsPage() {
       <section className="section section-tight">
         <div className="container">
           {error && <div className="alert alert-error">{error}</div>}
+          {fileError && <div className="alert alert-error" role="alert">{fileError}</div>}
           {loading ? (
             <div className="page-loader">
               <span className="spinner" aria-hidden="true" />
@@ -256,6 +299,13 @@ export default function ProjectsPage() {
                               {project.categoryName || 'Uncategorized'} · {project.visibility}
                               {!isStudent && project.studentName ? ` · ${project.studentName}` : ''}
                             </p>
+                            {project.reviewSummary && (
+                              <ReviewScoreSummary
+                                marks={project.reviewSummary.marks}
+                                rating={project.reviewSummary.rating}
+                                compact
+                              />
+                            )}
                           </div>
                           <span className="pill pill-public">{project.fileCount} file(s)</span>
                         </div>
@@ -308,14 +358,47 @@ export default function ProjectsPage() {
                           isTeacher={!isStudent}
                           onProjectChanged={loadProjects}
                         />
-                        <ProjectCommentsPanel project={project} />
+
+                        <section
+                          className={`project-files${!isStudent && project.files?.length ? ' project-files-teacher' : ''}`}
+                          id={`project-files-${project.projectId}`}
+                          aria-label={`Files for ${project.title}`}
+                          tabIndex="-1"
+                        >
+                          <div className="project-files-heading">
+                            <h4>{!isStudent && project.files?.length ? 'Latest student uploads' : 'Project files'}</h4>
+                            <span className="pill">{project.files?.length || 0}</span>
+                          </div>
+                          {project.files?.length ? (
+                            <ul className="project-file-list">
+                              {project.files.map((file) => (
+                                <li key={file.fileId}>
+                                  <button
+                                    className="project-file-link"
+                                    type="button"
+                                    onClick={() => downloadProjectFile(project.projectId, file)}
+                                  >
+                                    {file.name}
+                                  </button>
+                                  <span className="muted small">
+                                    {(file.size / (1024 * 1024)).toFixed(2)} MB · {file.uploadedAt}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="muted small">No files uploaded yet.</p>
+                          )}
+                        </section>
 
                         {isStudent && ['Draft', 'In Progress', 'Changes Requested'].includes(project.status) && <div className="upload-box">
                           <label className="btn btn-ghost btn-sm upload-button">
                             <input type="file" multiple onChange={(event) => handleUpload(project.projectId, event)} />
                             {uploadingId === project.projectId ? 'Uploading...' : 'Upload files'}
                           </label>
+                          <span className="muted small">New files appear in this project as soon as upload finishes; your teacher is notified.</span>
                         </div>}
+                        <ProjectCommentsPanel project={project} />
                       </article>
                     ))}
                   </div>

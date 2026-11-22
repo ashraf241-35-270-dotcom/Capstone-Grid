@@ -206,13 +206,13 @@ All responses are JSON. Errors use `{ "error": "message" }`.
 | POST   | `/api/sections`        | Teacher | Create a course section                          |
 | POST   | `/api/sections/:id/enrollments` | Teacher | Enroll a student by email         |
 | DELETE | `/api/sections/:id/enrollments/:studentId` | Teacher | Remove a student from a section |
-| GET    | `/api/projects`        | Token   | Student project list or teacher-owned project view |
+| GET    | `/api/projects`        | Token   | Student project list or teacher-owned project view, with latest review mark/rating summary |
 | POST   | `/api/projects`        | Student | Create a project repository for an enrolled section |
 | GET    | `/api/projects/:id`    | Token   | View one project and its uploaded files          |
-| GET    | `/api/projects/explore` | Public | Search/filter public accepted and archived projects; paginated (24/page) |
+| GET    | `/api/projects/explore` | Public | Search/filter accepted and archived public projects with latest review scores; paginated (24/page) |
 | GET    | `/api/projects/explore/:id/files/:fileId` | Public | Download a file from a public archived project |
 | PUT    | `/api/projects/:id`    | Student | Update metadata; move Draft → In Progress → Submitted, Changes Requested → In Progress, or Accepted → Archived |
-| POST   | `/api/projects/:id/files` | Student | Upload files to an editable project repository |
+| POST   | `/api/projects/:id/files` | Student | Upload files to an editable project; shows them to both project participants and notifies the assigned teacher |
 | GET    | `/api/projects/:id/files/:fileId` | Token | Download a project file privately |
 | GET   | `/api/projects/:id/tracking` | Token | View milestones, tasks, and project progress |
 | GET    | `/api/projects/:id/comments` | Owner/assigned teacher | View project conversation |
@@ -277,7 +277,8 @@ Implemented tables (see `database/schema.sql` for MySQL and `database/schema.sql
 - **`project_comments`** — `comment_id` PK, `project_id` FK, `user_id` FK, message, `created_at`;
   visible only to the project owner and assigned teacher.
 - **`notifications`** — `notification_id` PK, `user_id` FK, type, message, optional project/section
-  links, read state, `created_at`; each user can access only their own notifications.
+  links, read state, `created_at`; each user can access only their own notifications. A student's
+  project file upload alerts the assigned teacher and links directly to the project's file list.
 - **`posts`** — `post_id` PK, `user_id` FK, optional text and image metadata, `created_at`; public
   feed access, authenticated publishing.
 - **`post_comments`** — `comment_id` PK, `post_id` and `user_id` FKs, opinion, `created_at`; opinions
@@ -382,12 +383,16 @@ Each step is built and reviewed with the project owner before the next begins.
 2. `npm run dev` → API on :5000 and frontend on :5173.
 3. Sign in as a **Student** and open `/projects` from the navbar or dashboard.
 4. Create a project repository by selecting an enrolled section and category, then confirm it appears in the project list.
-5. Upload one or more project files and confirm the file count increases.
-6. Try uploading an unsupported file type → rejected with an error response.
-7. Open a project as the owner and verify the returned JSON includes the metadata and uploaded file list.
-8. Open the project as a teacher for the same section → access is allowed; as a different teacher or
+5. Upload one or more project files and confirm each file appears immediately beside the upload control.
+   As the assigned teacher, confirm an unread notification arrives, opens the relevant project, and
+   highlights downloadable files.
+6. Confirm the Project conversation appears below the uploaded files, shows only the two newest
+   messages initially, and expands/collapses with its See all messages control.
+7. Try uploading an unsupported file type → rejected with an error response.
+8. Open a project as the owner and verify the returned JSON includes the metadata and uploaded file list.
+9. Open the project as a teacher for the same section → access is allowed; as a different teacher or
    unrelated user → rejected with `403`.
-9. `GET /api/projects` and `GET /api/projects/:id` return only data the logged-in user is allowed to see.
+10. `GET /api/projects` and `GET /api/projects/:id` return only data the logged-in user is allowed to see.
 
 ## Step 4 verification checklist
 

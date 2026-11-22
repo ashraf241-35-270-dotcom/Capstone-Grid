@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api, { getErrorMessage } from '../api/client.js';
+import ReviewScoreSummary from './ReviewScoreSummary.jsx';
 
 export default function ReviewPanel({ project, isTeacher, onProjectChanged }) {
   const [reviews, setReviews] = useState([]);
@@ -57,7 +58,7 @@ export default function ReviewPanel({ project, isTeacher, onProjectChanged }) {
   return (
     <section className="review-panel" aria-label="Project reviews">
       <div className="review-panel-head">
-        <h4>Review history</h4>
+        <h4>Reviews &amp; feedback</h4>
         <span className="pill">{reviews.length}</span>
       </div>
 
@@ -132,14 +133,13 @@ export default function ReviewPanel({ project, isTeacher, onProjectChanged }) {
             <article className="review-card" key={review.reviewId}>
               <div className="review-card-head">
                 <strong>{review.decision}</strong>
-                <span className="muted small">
-                  {review.marks}/100 · {review.rating}/5
-                </span>
+                <span className="muted small">{review.teacherName} · {review.reviewedAt}</span>
               </div>
-              <p>{review.feedback}</p>
-              <span className="muted small">
-                {review.teacherName} · {review.reviewedAt}
-              </span>
+              <ReviewScoreSummary marks={review.marks} rating={review.rating} />
+              <div className="review-feedback">
+                <h5>Teacher feedback</h5>
+                <p>{review.feedback}</p>
+              </div>
             </article>
           ))}
         </div>

@@ -3,6 +3,7 @@ import api, { getErrorMessage } from '../api/client.js';
 
 export default function ProjectCommentsPanel({ project }) {
   const [comments, setComments] = useState([]);
+  const [showAll, setShowAll] = useState(false);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -35,6 +36,7 @@ export default function ProjectCommentsPanel({ project }) {
     try {
       const { data } = await api.post(`/projects/${project.projectId}/comments`, { message });
       setComments((current) => [data.comment, ...current]);
+      setShowAll(true);
       setMessage('');
     } catch (err) {
       setError(getErrorMessage(err, 'Could not send this comment.'));
@@ -45,7 +47,10 @@ export default function ProjectCommentsPanel({ project }) {
 
   return (
     <section className="project-comments" aria-label="Project conversation">
-      <h4>Project conversation</h4>
+      <div className="project-comments-heading">
+        <h4>Project conversation</h4>
+        <span className="pill">{comments.length}</span>
+      </div>
       {error && <div className="alert alert-error" role="alert">{error}</div>}
 
       <form className="comment-form" onSubmit={handleSubmit}>
@@ -69,7 +74,7 @@ export default function ProjectCommentsPanel({ project }) {
         <p className="muted small">Loading conversation...</p>
       ) : comments.length > 0 ? (
         <div className="comment-list">
-          {comments.map((comment) => (
+          {comments.slice(0, showAll ? comments.length : 2).map((comment) => (
             <article className="comment-card" key={comment.commentId}>
               <div className="comment-card-head">
                 <strong>{comment.authorName}</strong>
@@ -79,6 +84,16 @@ export default function ProjectCommentsPanel({ project }) {
               <time className="muted small">{comment.createdAt}</time>
             </article>
           ))}
+          {comments.length > 2 && (
+            <button
+              className="btn btn-ghost btn-sm comment-list-toggle"
+              type="button"
+              aria-expanded={showAll}
+              onClick={() => setShowAll((current) => !current)}
+            >
+              {showAll ? 'Show fewer messages' : `See all ${comments.length} messages`}
+            </button>
+          )}
         </div>
       ) : (
         <p className="muted small">No messages yet. Start the conversation.</p>

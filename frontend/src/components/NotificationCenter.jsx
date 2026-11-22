@@ -25,7 +25,7 @@ export default function NotificationCenter() {
 
   useEffect(() => {
     loadNotifications();
-    const timer = window.setInterval(loadNotifications, 30000);
+    const timer = window.setInterval(loadNotifications, 15000);
     return () => window.clearInterval(timer);
   }, [loadNotifications]);
 
@@ -56,7 +56,11 @@ export default function NotificationCenter() {
     }
 
     setOpen(false);
-    navigate(notification.sectionId ? '/sections' : (notification.projectId ? '/projects' : '/dashboard'));
+    if (notification.projectId) {
+      navigate('/projects', { state: { highlightProjectId: notification.projectId } });
+    } else {
+      navigate(notification.sectionId ? '/sections' : '/dashboard');
+    }
   }
 
   return (

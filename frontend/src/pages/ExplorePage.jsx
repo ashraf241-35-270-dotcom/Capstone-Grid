@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api, { getErrorMessage } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import CommunityFeed from '../components/CommunityFeed.jsx';
+import ReviewScoreSummary from '../components/ReviewScoreSummary.jsx';
 
 const EMPTY_FILTERS = {
   search: '',
@@ -33,6 +34,12 @@ function ProjectCard({ project }) {
         <div><dt>Category</dt><dd>{project.categoryName || 'Uncategorized'}</dd></div>
         <div><dt>Department</dt><dd>{project.departmentName || 'Not listed'}</dd></div>
       </dl>
+      {project.reviewSummary && (
+        <ReviewScoreSummary
+          marks={project.reviewSummary.marks}
+          rating={project.reviewSummary.rating}
+        />
+      )}
       {project.status === 'Archived' && project.files.length > 0 && (
         <section className="archive-files" aria-label="Archived project files">
           <h3>Project files</h3>
