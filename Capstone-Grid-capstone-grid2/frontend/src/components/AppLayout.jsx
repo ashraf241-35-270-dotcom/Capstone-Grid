@@ -13,6 +13,9 @@ export default function AppLayout() {
           <span>Capstone Grid</span>
           <span>Centralized capstone submissions, reviews and archive.</span>
         </div>
+        <div className="container footer-legal">
+          &copy; 2026 Grid Team. All rights reserved.
+        </div>
       </footer>
     </div>
   );

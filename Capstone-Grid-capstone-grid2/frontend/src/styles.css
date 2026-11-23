@@ -2166,6 +2166,13 @@ button {
   font-size: 0.84rem;
 }
 
+.footer-legal {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 1000px) {
