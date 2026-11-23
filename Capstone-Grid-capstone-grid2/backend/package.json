@@ -1,0 +1,30 @@
+{
+  "name": "capstone-grid-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capstone Grid REST API (Node.js + Express + MySQL).",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "db:verify": "node scripts/verify-db.js",
+    "db:seed-demo": "node scripts/seed-demo.js",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.5.0",
+    "mysql2": "^3.14.0",
+    "nodemailer": "^10.6.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.1.4"
+  }
+}
