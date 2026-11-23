@@ -243,6 +243,12 @@ describe('project file uploads', () => {
   });
 
   test('lets the assigned teacher update marks and feedback while preserving review history', async () => {
+    const beforeUpdate = await request(app)
+      .get(`/api/projects/${projectId}/reviews`)
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .expect(200);
+    const latestReviewId = beforeUpdate.body.reviews[0].reviewId;
+
     await request(app)
       .post(`/api/projects/${projectId}/reviews`)
       .set('Authorization', `Bearer ${otherTeacherToken}`)
@@ -263,8 +269,9 @@ describe('project file uploads', () => {
         marks: 96.25,
         rating: 5
       })
-      .expect(201);
+      .expect(200);
     expect(update.body.review).toMatchObject({
+      reviewId: latestReviewId,
       decision: 'Accepted',
       feedback: 'Updated final feedback.',
       marks: 96.25,
@@ -275,9 +282,35 @@ describe('project file uploads', () => {
       .get(`/api/projects/${projectId}/reviews`)
       .set('Authorization', `Bearer ${teacherToken}`)
       .expect(200);
-    expect(history.body.reviews).toHaveLength(3);
-    expect(history.body.reviews[0].reviewId).toBe(update.body.review.reviewId);
-    expect(history.body.reviews[2].feedback).toBe('First review.');
+    expect(history.body.reviews).toHaveLength(2);
+    expect(history.body.reviews[0]).toMatchObject({
+      reviewId: latestReviewId,
+      feedback: 'Updated final feedback.',
+      marks: 96.25
+    });
+    expect(history.body.reviews[1].feedback).toBe('First review.');
+
+    await request(app)
+      .post(`/api/projects/${projectId}/reviews`)
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .send({
+        decision: 'Accepted',
+        feedback: 'Updated again.',
+        marks: 97,
+        rating: 5
+      })
+      .expect(200);
+
+    const updatedHistory = await request(app)
+      .get(`/api/projects/${projectId}/reviews`)
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .expect(200);
+    expect(updatedHistory.body.reviews).toHaveLength(2);
+    expect(updatedHistory.body.reviews[0]).toMatchObject({
+      reviewId: latestReviewId,
+      feedback: 'Updated again.',
+      marks: 97
+    });
 
     await request(app)
       .post(`/api/projects/${projectId}/reviews`)

@@ -1074,10 +1074,25 @@ router.post('/:id/reviews', requireAuth, async (req, res) => {
         [projectId]
       );
       const existingReviews = await execute(
-        'SELECT review_id FROM reviews WHERE project_id = ? LIMIT 1',
+        'SELECT review_id FROM reviews WHERE project_id = ? ORDER BY reviewed_at DESC, review_id DESC LIMIT 1',
         [projectId]
       );
       if (currentProjects[0]?.status !== project.status || existingReviews.length === 0) return null;
+
+      const latestReviewId = existingReviews[0].review_id;
+      await execute(
+        `UPDATE reviews
+            SET teacher_id = ?, decision = ?, feedback = ?, marks = ?, rating = ?, reviewed_at = CURRENT_TIMESTAMP
+          WHERE review_id = ? AND project_id = ?`,
+        [req.user.id, decision, cleanFeedback, marks, rating, latestReviewId, projectId]
+      );
+      await createNotification(execute, {
+        userId: project.student_id,
+        type: 'feedback',
+        message: `Updated review feedback is available for "${project.title}".`,
+        projectId
+      });
+      return latestReviewId;
     }
 
     const result = await execute(
@@ -1106,7 +1121,7 @@ router.post('/:id/reviews', requireAuth, async (req, res) => {
       LIMIT 1`,
     [reviewId]
   );
-  return res.status(201).json({ review: normalizeReview(rows[0]) });
+  return res.status(isInitialReview ? 201 : 200).json({ review: normalizeReview(rows[0]) });
 });
 
 router.get('/:id', requireAuth, async (req, res) => {

@@ -46,7 +46,10 @@ export default function ReviewPanel({ project, isTeacher, onProjectChanged }) {
         marks: Number(form.marks),
         rating: Number(form.rating)
       });
-      setReviews((current) => [data.review, ...current]);
+      setReviews((current) => [
+        data.review,
+        ...current.filter((review) => review.reviewId !== data.review.reviewId)
+      ]);
       setForm({ decision: '', feedback: '', marks: '', rating: '' });
       setEditingReview(false);
       await onProjectChanged();
@@ -82,15 +85,15 @@ export default function ReviewPanel({ project, isTeacher, onProjectChanged }) {
       tabIndex="-1"
     >
       <div className="review-panel-head">
-        <h4>Reviews &amp; feedback</h4>
-        <span className="pill">{reviews.length}</span>
+        <h4>Latest review &amp; feedback</h4>
+        <span className="pill">{reviews.length > 0 ? 1 : 0}</span>
       </div>
 
       {error && <div className="alert alert-error" role="alert">{error}</div>}
 
       {canUpdateReview && !editingReview && (
         <div className="review-update-action">
-          <p className="muted small">Update marks or feedback without losing the previous review entry.</p>
+          <p className="muted small">Update the latest marks or feedback.</p>
           <button type="button" className="btn btn-ghost btn-sm" onClick={startEditingReview}>
             Update marks and feedback
           </button>
@@ -114,7 +117,7 @@ export default function ReviewPanel({ project, isTeacher, onProjectChanged }) {
             </label>
           ) : (
             <p className="muted small">
-              Current decision: <strong>{project.status}</strong>. Saving adds an updated review entry to the history.
+              Current decision: <strong>{project.status}</strong>. Saving updates the latest review.
             </p>
           )}
 
@@ -173,7 +176,7 @@ export default function ReviewPanel({ project, isTeacher, onProjectChanged }) {
         <p className="muted small">Loading review history...</p>
       ) : reviews.length > 0 ? (
         <div className="review-list">
-          {reviews.map((review) => (
+          {reviews.slice(0, 1).map((review) => (
             <article className="review-card" key={review.reviewId}>
               <div className="review-card-head">
                 <strong>{review.decision}</strong>
