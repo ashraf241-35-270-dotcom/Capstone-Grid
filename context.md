@@ -643,3 +643,15 @@ Step 5 is built and awaits owner review. Continue with Step 6 only after explici
   verification also remains pending.
 - Next step proposal: Step 8 — public dashboard exploration, search/filter and archived project browsing,
   only after explicit owner approval.
+
+
+### 2026-11-23 — Step 8 exploration and archive work log (assistant)
+
+- Owner prompt (verbatim): `file ta read koro and next features ta add koro then ager kono code e change korba nh`
+- Files added: `frontend/src/pages/ExplorePage.jsx`.
+- Files changed: `backend/src/routes/projects.js`, `frontend/src/App.jsx`, `frontend/src/components/Navbar.jsx`, `frontend/src/pages/LandingPage.jsx`, `frontend/src/pages/ProjectsPage.jsx`, `frontend/src/styles.css`, `README.md`, `context.md`.
+- Scope delivered: public project exploration endpoint with search across title/description/student/supervisor and filters for category, department and status; public project detail endpoint; public archive endpoint; Explore and Archive pages; public details omit repository file paths, private reviews and private comments. Owners can archive accepted public projects; archive records reuse `projects.status = 'Archived'` and `archived_at`.
+- Decisions: existing project, authentication, review, tracking, community and notification implementations were retained; no schema migration or new archive table was required. Public browsing is limited to Public projects in Submitted, Under Review, Accepted or Archived states. Only the project owner can request the Accepted → Archived transition, and only for a Public project.
+- Verification performed: pending in this environment. The uploaded archive does not include installed `node_modules`; run `npm install`, `npm run db:verify`, `npm run build`, and the Step 8 browser/API checklist in README. Backend syntax checks and database integration checks are still required before considering this step fully verified.
+- Known issues/follow-ups: live API/database and browser checks were not run in this environment. Public endpoints currently return up to 100 results per request (no pagination).
+- Next step proposal: Step 9 — password recovery, automated tests, validation/security hardening and documentation polish, only after owner review.

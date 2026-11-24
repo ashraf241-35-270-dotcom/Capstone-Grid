@@ -136,6 +136,74 @@ function normalizeReview(row) {
   };
 }
 
+const publicProjectSelect = `SELECT p.project_id, p.student_id, p.section_id, p.category_id, p.title, p.description,
+       p.status, p.visibility, p.created_at, p.submitted_at, p.archived_at,
+       c.name AS category_name, s.section_name, s.semester, u.name AS student_name,
+       teacher.name AS teacher_name, d.name AS department_name, co.course_code, co.title AS course_title,
+       (SELECT COUNT(*) FROM project_files pf WHERE pf.project_id = p.project_id) AS file_count,
+       (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.project_id) AS milestone_count,
+       (SELECT COUNT(*) FROM milestones m WHERE m.project_id = p.project_id AND m.status = 'Completed') AS completed_milestone_count,
+       (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id) AS task_count,
+       (SELECT COUNT(*) FROM milestone_tasks mt JOIN milestones m ON m.milestone_id = mt.milestone_id WHERE m.project_id = p.project_id AND mt.status = 'Completed') AS completed_task_count
+  FROM projects p
+  LEFT JOIN categories c ON c.category_id = p.category_id
+  LEFT JOIN sections s ON s.section_id = p.section_id
+  LEFT JOIN courses co ON co.course_id = s.course_id
+  LEFT JOIN departments d ON d.department_id = co.department_id
+  JOIN users u ON u.user_id = p.student_id
+  LEFT JOIN users teacher ON teacher.user_id = s.teacher_id`;
+
+function publicProject(row) {
+  return {
+    ...normalizeProject(row),
+    teacherName: row.teacher_name || null,
+    departmentName: row.department_name || null,
+    courseCode: row.course_code || null,
+    courseTitle: row.course_title || null
+  };
+}
+
+router.get('/public', async (req, res) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 120) : '';
+  const filters = ["p.visibility = 'Public'", "p.status <> 'Draft'", "p.status <> 'In Progress'", "p.status <> 'Changes Requested'"];
+  const params = [];
+  if (search) {
+    filters.push('(p.title LIKE ? OR p.description LIKE ? OR u.name LIKE ? OR teacher.name LIKE ?)');
+    const term = `%${search}%`;
+    params.push(term, term, term, term);
+  }
+  for (const [key, column] of Object.entries({ category: 'p.category_id', department: 'co.department_id', status: 'p.status' })) {
+    const value = req.query[key];
+    if (value !== undefined && value !== '') {
+      if (key === 'status') {
+        if (!['Submitted', 'Under Review', 'Accepted'].includes(value)) return res.status(400).json({ error: 'Invalid project status filter.' });
+        filters.push(`${column} = ?`);
+        params.push(value);
+      } else {
+        const id = parseId(value);
+        if (!id) return res.status(400).json({ error: `Invalid ${key} filter.` });
+        filters.push(`${column} = ?`);
+        params.push(id);
+      }
+    }
+  }
+  const rows = await query(`${publicProjectSelect} WHERE ${filters.join(' AND ')} ORDER BY p.created_at DESC LIMIT 100`, params);
+  return res.json({ projects: rows.map(publicProject) });
+});
+
+router.get('/archive', async (_req, res) => {
+  const rows = await query(`${publicProjectSelect} WHERE p.visibility = 'Public' AND p.status = 'Archived' ORDER BY p.archived_at DESC, p.created_at DESC LIMIT 100`);
+  return res.json({ projects: rows.map(publicProject) });
+});
+
+router.get('/public/:id', async (req, res) => {
+  const projectId = parseId(req.params.id);
+  if (!projectId) return res.status(400).json({ error: 'Invalid project id.' });
+  const rows = await query(`${publicProjectSelect} WHERE p.project_id = ? AND p.visibility = 'Public' AND p.status IN ('Submitted', 'Under Review', 'Accepted', 'Archived') LIMIT 1`, [projectId]);
+  if (!rows.length) return res.status(404).json({ error: 'Public project not found.' });
+  return res.json({ project: publicProject(rows[0]) });
+});
+
 router.get('/', requireAuth, async (req, res) => {
   if (req.user.role === 'Teacher') {
     const projects = await query(
@@ -880,10 +948,14 @@ router.put('/:id', requireAuth, async (req, res) => {
     const nextStatuses = {
       Draft: 'In Progress',
       'In Progress': 'Submitted',
-      'Changes Requested': 'In Progress'
+      'Changes Requested': 'In Progress',
+      Accepted: 'Archived'
     };
     if (status !== nextStatuses[project.status]) {
       return res.status(400).json({ error: 'Project status can only move to its next workflow stage.' });
+    }
+    if (status === 'Archived' && project.visibility !== 'Public') {
+      return res.status(400).json({ error: 'Only public accepted projects can be archived.' });
     }
     updates.push('status = ?');
     params.push(status);

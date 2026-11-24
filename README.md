@@ -5,7 +5,7 @@ projects**. Students build project repositories and submit work; teachers create
 students, review submissions and record feedback, marks and ratings; everyone can explore public
 projects and community posts.
 
-> **Project status:** Step 4 of 9 complete — project tracking, milestones, tasks, and progress.
+> **Project status:** Step 8 of 9 implemented — public project exploration, filters and archive browsing.
 > See [Roadmap](#roadmap) and [`context.md`](./context.md) for the step-by-step build plan.
 
 ---
@@ -172,6 +172,9 @@ All responses are JSON. Errors use `{ "error": "message" }`.
 | POST   | `/api/sections/:id/enrollments` | Teacher | Enroll a student by email         |
 | DELETE | `/api/sections/:id/enrollments/:studentId` | Teacher | Remove a student from a section |
 | GET    | `/api/projects`        | Token   | Student project list or teacher-owned project view |
+| GET    | `/api/projects/public` | Public  | Search/filter public submitted, under-review and accepted projects |
+| GET    | `/api/projects/public/:id` | Public | View public project details without private files or reviews |
+| GET    | `/api/projects/archive` | Public | Browse public archived projects |
 | POST   | `/api/projects`        | Student | Create a project repository for an enrolled section |
 | GET    | `/api/projects/:id`    | Token   | View one project and its uploaded files          |
 | PUT    | `/api/projects/:id`    | Student | Update metadata; move Draft → In Progress → Submitted or Changes Requested → In Progress → Submitted |
@@ -246,7 +249,7 @@ Implemented tables (see `database/schema.sql` for MySQL and `database/schema.sql
   `status`, timestamps.
 - **`milestone_tasks`** — `task_id` PK, `milestone_id` FK, `title`, `due_date`, `status`, timestamps.
 
-The `posts` and `post_comments` tables from the proposal ER model are implemented in Step 7.
+The `posts` and `post_comments` tables from the proposal ER model are implemented in Step 7. Step 8 reuses the existing `projects` table; no separate archive table was added.
 
 Project progress is calculated from completed tasks when a project has tasks; otherwise it is
 calculated from completed milestones. Projects with no milestones start at 0%.
@@ -278,7 +281,7 @@ Each step is built and reviewed with the project owner before the next begins.
   Project comments and notifications (assignments, submissions, feedback, deadlines).
 - [x] **Step 7 — Community dashboard (FR-13, FR-14)**
   Public text/photo posts, image upload, opinions on posts; public `/community` page.
-- [ ] **Step 8 — Exploration + archive (FR-05, FR-10, FR-12)**
+- [x] **Step 8 — Exploration + archive (FR-05, FR-10, FR-12)**
   Public dashboard data, search/filter by name, student, teacher, category, department, status,
   archived project browsing.
 - [ ] **Step 9 — Completion + hardening (FR-01 recovery, NFRs)**
@@ -380,3 +383,16 @@ Each step is built and reviewed with the project owner before the next begins.
 6. Log in as a Teacher and add an opinion to a post; confirm it appears in the post's opinion list.
 7. Confirm logged-out visitors cannot publish posts or opinions.
 8. Restart the API and confirm posts, opinions and uploaded images remain available.
+
+
+## Step 8 verification checklist
+
+1. Run `npm run db:verify` and confirm the existing project, course, department and category tables are available.
+2. Open `/explore` while logged out; confirm only public submitted, under-review and accepted projects appear.
+3. Search by project title/description, student name or supervisor name.
+4. Filter by department, category and status; combine filters and confirm results narrow correctly.
+5. Open a public project detail page and confirm student, supervisor, department, course, semester and progress are displayed.
+6. Confirm private projects and private files/review feedback are never exposed by public endpoints.
+7. As the owner of an accepted public project, choose Archive project; confirm it appears under `/archive`.
+8. Confirm private accepted projects cannot be archived and unrelated users cannot access private project data.
+9. Confirm existing login, project repository, tracking, review, comments, notifications and community flows still work.
